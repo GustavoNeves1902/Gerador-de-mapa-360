@@ -1,0 +1,71 @@
+body {
+  font-family: Arial, sans-serif;
+  background-color: #0d5fb3;
+  color: white;
+  text-align: center;
+  height: 100vh;
+}
+
+#viewer {
+  width: 90%;
+  height: 70vh;
+  margin: 20px auto;
+  border: 3px solid white;
+  border-radius: 10px;
+}
+
+button {
+  background-color: white;
+  color: #0d5fb3;
+  font-weight: bold;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  margin: 5px;
+  cursor: pointer;
+}
+
+#controls {
+  margin: 20px;
+}
+
+/* Modal geral */
+.modal {
+  display: none; /* Escondido por padrão */
+  position: fixed;
+  z-index: 1000; 
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto; 
+  background-color: rgba(0,0,0,0.6); /* Fundo semi-transparente */
+}
+
+/* Conteúdo da modal */
+.modal-content {
+  background-color: #fefefe;
+  margin: 10% auto; 
+  padding: 20px;
+  border: 1px solid #888;
+  width: 80%; 
+  max-width: 600px;
+  border-radius: 8px;
+}
+
+/* Botão de fechar */
+.modal .close {
+  color: #aaa;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.modal .close:hover {
+  color: black;
+}
+
+h2,li{
+    color: black;
+}
