@@ -33,22 +33,22 @@ button {
 .modal {
   display: none; /* Escondido por padrão */
   position: fixed;
-  z-index: 1000; 
+  z-index: 1000;
   left: 0;
   top: 0;
   width: 100%;
   height: 100%;
-  overflow: auto; 
-  background-color: rgba(0,0,0,0.6); /* Fundo semi-transparente */
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.6); /* Fundo semi-transparente */
 }
 
 /* Conteúdo da modal */
 .modal-content {
   background-color: #fefefe;
-  margin: 10% auto; 
+  margin: 10% auto;
   padding: 20px;
   border: 1px solid #888;
-  width: 80%; 
+  width: 80%;
   max-width: 600px;
   border-radius: 8px;
 }
@@ -66,6 +66,33 @@ button {
   color: black;
 }
 
-h2,li{
-    color: black;
+h2,
+li {
+  color: black;
+}
+
+/* --- TOAST NOTIFICATION (MENSAGEM TEMPORÁRIA) --- */
+#toast {
+  visibility: hidden;
+  min-width: 250px;
+  background-color: #333;
+  color: #fff;
+  text-align: center;
+  border-radius: 50px; /* Bordas arredondadas */
+  padding: 16px;
+  position: fixed;
+  z-index: 10001; /* Fica acima do modal */
+  left: 50%;
+  bottom: 30px;
+  transform: translateX(-50%);
+  font-size: 16px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transition: opacity 0.5s, bottom 0.5s;
+}
+
+#toast.show {
+  visibility: visible;
+  opacity: 1;
+  bottom: 50px; /* Efeito de subir */
 }
