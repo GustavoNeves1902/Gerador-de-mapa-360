@@ -1,6 +1,10 @@
+:root {
+  --cor-azul: #0d5fb3;
+}
+
 body {
   font-family: Arial, sans-serif;
-  background-color: #0d5fb3;
+  background-color: var(--cor-azul);
   color: white;
   text-align: center;
   height: 100vh;
@@ -16,13 +20,14 @@ body {
 
 button {
   background-color: white;
-  color: #0d5fb3;
+  color: var(--cor-azul);
   font-weight: bold;
   padding: 10px 20px;
   border: none;
   border-radius: 10px;
   margin: 5px;
   cursor: pointer;
+  text-transform: uppercase;
 }
 
 #controls {
@@ -95,4 +100,112 @@ li {
   visibility: visible;
   opacity: 1;
   bottom: 50px; /* Efeito de subir */
+}
+
+/* --- AJUSTE PARA LISTAS DE HOTSPOTS E CENAS --- */
+
+#hotspotListContainer,
+#sceneSelectContainer {
+  margin: 20px auto;
+  width: 90%;
+  text-align: left; /* Alinha o texto à esquerda para facilitar leitura */
+  background: rgba(255, 255, 255, 0.1); /* Fundo sutil para destacar do azul */
+  padding: 15px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+#hotspotListContainer h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+#hotspotListContainer ul {
+  list-style: none; /* REMOVE O PONTO PRETO */
+  padding: 0;
+  margin: 0;
+}
+
+#hotspotListContainer li {
+  background: white; /* Fundo branco para os itens da lista */
+  color: var(--cor-azul); /* Texto azul para contrastar */
+  margin-bottom: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Ajuste para os botões dentro da lista (X e Editar) */
+#hotspotListContainer li button {
+  padding: 5px 10px;
+  font-size: 11px;
+  margin-left: 5px;
+  background-color: var(--cor-azul);
+  color: white;
+}
+
+/* Estilo do Seletor de Cenas */
+#sceneSelectContainer select {
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  font-weight: bold;
+  color: var(--cor-azul);
+  margin-left: 10px;
+}
+
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 999;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: #fff;
+  padding: 20px;
+  width: 320px;
+  border-radius: 10px;
+}
+
+.modal-content h3 {
+  margin-top: 0;
+}
+
+.modal-content label {
+  display: block;
+  margin-top: 12px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+#saving-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.saving-box {
+  background: white;
+  padding: 25px 40px;
+  border-radius: 8px;
+  font-size: 16px;
+  color: #333;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }

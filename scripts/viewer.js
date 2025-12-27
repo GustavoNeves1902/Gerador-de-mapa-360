@@ -1,0 +1,105 @@
+// viewer.js
+const supabaseClient = window.supabaseClient;
+
+// =========================
+// Utils
+// =========================
+function getPanoramaIdFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("tourId");
+}
+
+// =========================
+// Renderização
+// =========================
+function renderizarPanorama(estruturaJson) {
+  if (!estruturaJson || Object.keys(estruturaJson).length === 0) {
+    alert("Panorama vazio ou inválido.");
+    return;
+  }
+
+  const scenes = {};
+  let firstScene = null;
+
+  Object.keys(estruturaJson).forEach((id) => {
+    const cena = estruturaJson[id];
+    if (!cena?.dataURL) return;
+
+    if (!firstScene) firstScene = id;
+
+    scenes[id] = {
+      type: "equirectangular",
+      panorama: cena.dataURL,
+      hotSpots: (cena.hotSpots || []).map((h) => ({
+        id: h.id,
+        pitch: h.pitch,
+        yaw: h.yaw,
+        type: "scene",
+        sceneId: h.sceneId,
+        targetYaw: h.targetYaw ?? 0,
+        text: decodeURIComponent(h.text || ""),
+      })),
+    };
+  });
+
+  const viewer = pannellum.viewer("viewer", {
+    default: {
+      firstScene,
+      autoLoad: true,
+    },
+    scenes,
+  });
+
+  // ===== MENU DE CENAS =====
+  const menu = document.getElementById("sceneMenu");
+  const select = document.getElementById("sceneSelect");
+
+  if (menu && select) {
+    Object.keys(scenes).forEach((id) => {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = id;
+      select.appendChild(opt);
+    });
+
+    select.value = firstScene;
+    select.onchange = () => viewer.loadScene(select.value);
+    menu.style.display = "block";
+  }
+
+  const loading = document.getElementById("loading");
+  if (loading) loading.style.display = "none";
+}
+
+// =========================
+// Carregar do Supabase
+// =========================
+async function carregarPanorama() {
+  const panoramaId = getPanoramaIdFromUrl();
+
+  if (!panoramaId) {
+    alert("ID do panorama não informado.");
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("panoramas")
+      .select("estrutura_json")
+      .eq("id", panoramaId)
+      .single();
+
+    if (error) throw error;
+    if (!data?.estrutura_json) throw new Error("Estrutura não encontrada.");
+
+    renderizarPanorama(data.estrutura_json);
+  } catch (err) {
+    console.error(err);
+    alert("Erro ao carregar panorama.");
+  }
+}
+
+// =========================
+// Init
+// =========================
+document.addEventListener("DOMContentLoaded", carregarPanorama);

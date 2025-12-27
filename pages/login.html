@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="/styles/login.css" rel="stylesheet">
+    <title>Login</title>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>Acessar</h1>
+        <h2>Digite seus dados</h2>
+
+        <form>
+            <input id="email" type="email" placeholder="Email" required>
+            <input id="password" type="password" placeholder="Senha" required>
+
+            <div class="lembrar">
+                <input type="checkbox" id="lembrar">
+                <label for="lembrar">Lembrar senha</label>
+            </div>
+
+            <button class="btn-primary" type="submit">ACESSAR</button>
+
+            <a href="/pages/registro.html" class="btn-primary">NÃO TENHO UM CADASTRO</a>
+        </form>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/scripts/supabase.js"></script>
+    <script src="/scripts/login.js"></script>
+
+</body>
+
+</html>

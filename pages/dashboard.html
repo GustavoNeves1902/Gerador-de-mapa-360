@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meus Panoramas - 360 Pro</title>
+    <link rel="stylesheet" href="/styles/dashboard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <header class="navbar">
+        <div class="logo"><img class="logo" src="/Logo.png"> </div>
+        <div class="user-menu">
+            <span id="user-name">Imobiliária Silva</span>
+            <button id="btn-logout">Sair</button>
+        </div>
+    </header>
+
+    <main class="content">
+        <div class="content-header">
+            <h1>Meus Panoramas</h1>
+            <a href="/pages/gerador.html" class="btn-add">+ Criar Novo</a>
+        </div>
+        <p id="loading-message" style="text-align:center; margin-top:40px;">
+            ⏳ Carregando panoramas...
+        </p>
+        <div class="panorama-grid" id="panorama-list">
+        </div>
+
+        <div id="empty-state" class="hidden">
+            <p>Você ainda não criou nenhum panorama 360.</p>
+        </div>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/scripts/supabase.js"></script>
+    <script src="/scripts/dashboard.js"></script>
+</body>
+
+</html>

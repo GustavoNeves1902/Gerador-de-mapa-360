@@ -1,191 +1,209 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <title>GL360º - Gerador de Panoramas</title>
 
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css"
-    />
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+<head>
+  <meta charset="UTF-8" />
+  <title>GL360º - Gerador de Panoramas</title>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css" />
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
 
-    <link href="../styles/gerador.css" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-    <style>
-      /* --- ESTILOS PARA O MODAL DE QR CODE --- */
-      #modalQR {
-        display: none; /* Escondido por padrão */
-        position: fixed;
-        z-index: 9999; /* Fica acima de tudo */
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.8); /* Fundo escuro */
-        align-items: center;
-        justify-content: center;
+  <link href="../styles/gerador.css" rel="stylesheet" />
+
+  <style>
+    /* --- ESTILOS PARA O MODAL DE QR CODE --- */
+    #modalQR {
+      display: none;
+      /* Escondido por padrão */
+      position: fixed;
+      z-index: 9999;
+      /* Fica acima de tudo */
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.8);
+      /* Fundo escuro */
+      align-items: center;
+      justify-content: center;
+    }
+
+    .qr-content {
+      background-color: #fff;
+      margin: 10% auto;
+      /* Centraliza verticalmente */
+      padding: 20px;
+      border-radius: 10px;
+      width: 300px;
+      text-align: center;
+      position: relative;
+      font-family: sans-serif;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Centraliza a imagem do QR Code */
+    #qrcodeCanvas {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+    }
+
+    .close-qr {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 24px;
+      font-weight: bold;
+      color: #aaa;
+      cursor: pointer;
+    }
+
+    .close-qr:hover {
+      color: #000;
+    }
+
+    /* Botão de download direto dentro do modal */
+    #downloadDirectBtn {
+      background-color: #28a745;
+      color: white;
+      padding: 10px;
+      width: 100%;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    #downloadDirectBtn:hover {
+      background-color: #218838;
+    }
+
+    /* Loader de carregamento */
+    .loader {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin: 10px auto;
+      display: none;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
       }
 
-      .qr-content {
-        background-color: #fff;
-        margin: 10% auto; /* Centraliza verticalmente */
-        padding: 20px;
-        border-radius: 10px;
-        width: 300px;
-        text-align: center;
-        position: relative;
-        font-family: sans-serif;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      100% {
+        transform: rotate(360deg);
       }
+    }
+  </style>
+</head>
 
-      /* Centraliza a imagem do QR Code */
-      #qrcodeCanvas {
-        display: flex;
-        justify-content: center;
-        margin: 20px 0;
-      }
+<body>
+  <h1>GL360º - Gerador de Panoramas</h1>
 
-      .close-qr {
-        position: absolute;
-        top: 10px;
-        right: 15px;
-        font-size: 24px;
-        font-weight: bold;
-        color: #aaa;
-        cursor: pointer;
-      }
-      .close-qr:hover {
-        color: #000;
-      }
+  <div id="controls">
 
-      /* Botão de download direto dentro do modal */
-      #downloadDirectBtn {
-        background-color: #28a745;
-        color: white;
-        padding: 10px;
-        width: 100%;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        margin-top: 10px;
-        font-size: 14px;
-      }
-      #downloadDirectBtn:hover {
-        background-color: #218838;
-      }
+    <label>Nome da cena:</label>
+    <input type="text" id="nome" accept="image/*" /><br /><br />
+    <label>Selecione imagem:</label>
+    <input type="file" id="fileInput" accept="image/*" /><br /><br />
 
-      /* Loader de carregamento */
-      .loader {
-        border: 4px solid #f3f3f3;
-        border-top: 4px solid #3498db;
-        border-radius: 50%;
-        width: 30px;
-        height: 30px;
-        animation: spin 1s linear infinite;
-        margin: 10px auto;
-        display: none;
-      }
-      @keyframes spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <h1>GL360º - Gerador de Panoramas</h1>
 
-    <div id="controls">
-      <label>Selecione imagem:</label>
-      <input type="file" id="fileInput" accept="image/*" /><br /><br />
 
-      <label>ID da imagem:</label>
-      <input type="text" id="imageId" placeholder="ex: sala" /><br /><br />
+    <label>ID da imagem:</label>
+    <input type="text" id="imageId" placeholder="ex: sala" /><br /><br />
 
-      <button id="addScene">Adicionar Cena</button>
-      <button
-        id="removeScene"
-        title="Remove a cena atualmente carregada e todos os hotspots que apontam para ela."
-      >
-        🗑️ Remover Cena Atual
+    <button id="addScene">Adicionar Cena</button>
+    <button id="removeScene" title="Remove a cena atualmente carregada e todos os hotspots que apontam para ela.">
+      🗑️ Remover Cena Atual
+    </button>
+    <button id="addHotspot">Adicionar Hotspot</button>
+
+    <button id="salvarPlataforma">
+      🚀 PUBLICAR NA MINHA CONTA
+    </button>
+
+    <button id="passoAPasso">Passo a Passo</button>
+  </div>
+
+  <div id="editHotspotModal" class="modal">
+    <div class="modal-content">
+      <h3>Editar Hotspot</h3>
+
+      <label>Cena de destino</label>
+      <select id="editHotspotScene"></select>
+
+      <label>Yaw ao chegar</label>
+      <input type="range" id="editHotspotYaw" min="-180" max="180" step="1">
+      <span id="editHotspotYawValue">0°</span>
+
+      <div class="modal-actions">
+        <button id="saveHotspotEdit">Salvar</button>
+        <button id="cancelHotspotEdit">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="saving-overlay" style="display:none;">
+    <div class="saving-box">
+      <p>💾 Salvando panorama...</p>
+    </div>
+  </div>
+
+
+  <div id="modalPasso" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>Passo a Passo - Como usar a ferramenta</h2>
+      <ol>
+        <li>Selecione uma imagem panorâmica e insira um ID.</li>
+        <li>Clique em "Adicionar Cena" para carregar a imagem.</li>
+        <li>Repita para todas as cenas que desejar.</li>
+        <li>
+          Você pode conferir as cenas adicionadas antes de começar a editar.
+        </li>
+        <li>
+          Escolha a cena que quer editar, clique em "Adicionar Hotspot".
+        </li>
+        <li>
+          Clique no local exato onde você quer que o hotspot apareça e insira
+          o ID da cena para onde quer ir.
+        </li>
+        <li>Quando terminar, clique em "Download / QR Code".</li>
+        <li>
+          Escolha se quer baixar no PC ou gerar um QR Code para o celular.
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <div id="viewer" style="width: 100%; height: 700px"></div>
+
+
+  <div id="customAlert" class="modal" style="z-index: 10002">
+    <div class="modal-content" style="max-width: 300px; text-align: center">
+      <h3 style="margin-top: 0; color: #333">Aviso</h3>
+      <p id="customAlertMsg" style="font-size: 16px; color: #666; margin: 20px 0">
+        Mensagem aqui
+      </p>
+      <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0" />
+      <button id="customAlertBtn" style="width: 100%; background-color: #007bff; margin: 0">
+        OK
       </button>
-      <button id="addHotspot">Adicionar Hotspot</button>
-
-      <button id="downloadPanorama">Download / QR Code</button>
-
-      <button id="passoAPasso">Passo a Passo</button>
     </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/scripts/supabase.js"></script>
+  <script src="/scripts/gerador.js"></script>
 
-    <div id="modalPasso" class="modal">
-      <div class="modal-content">
-        <span class="close">&times;</span>
-        <h2>Passo a Passo - Como usar a ferramenta</h2>
-        <ol>
-          <li>Selecione uma imagem panorâmica e insira um ID.</li>
-          <li>Clique em "Adicionar Cena" para carregar a imagem.</li>
-          <li>Repita para todas as cenas que desejar.</li>
-          <li>
-            Você pode conferir as cenas adicionadas antes de começar a editar.
-          </li>
-          <li>
-            Escolha a cena que quer editar, clique em "Adicionar Hotspot".
-          </li>
-          <li>
-            Clique no local exato onde você quer que o hotspot apareça e insira
-            o ID da cena para onde quer ir.
-          </li>
-          <li>Quando terminar, clique em "Download / QR Code".</li>
-          <li>
-            Escolha se quer baixar no PC ou gerar um QR Code para o celular.
-          </li>
-        </ol>
-      </div>
-    </div>
+</body>
 
-    <div id="modalQR">
-      <div class="qr-content">
-        <span class="close-qr">&times;</span>
-        <h3>Baixar no Celular</h3>
-        <p id="qrStatus">Gerando link...</p>
-
-        <div class="loader" id="qrLoader"></div>
-
-        <div id="qrcodeCanvas"></div>
-
-        <p style="font-size: 12px; color: #666">
-          Link temporário. Expira em breve.
-        </p>
-        <hr />
-      </div>
-    </div>
-
-    <div id="viewer" style="width: 100%; height: 700px"></div>
-
-    <script src="../scripts/gerador.js"></script>
-    <div id="customAlert" class="modal" style="z-index: 10002">
-      <div class="modal-content" style="max-width: 300px; text-align: center">
-        <h3 style="margin-top: 0; color: #333">Aviso</h3>
-        <p
-          id="customAlertMsg"
-          style="font-size: 16px; color: #666; margin: 20px 0"
-        >
-          Mensagem aqui
-        </p>
-        <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0" />
-        <button
-          id="customAlertBtn"
-          style="width: 100%; background-color: #007bff; margin: 0"
-        >
-          OK
-        </button>
-      </div>
-    </div>
-  </body>
 </html>
