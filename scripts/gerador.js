@@ -176,6 +176,19 @@ function bindUI() {
   if (btnPasso)
     btnPasso.onclick = () =>
       (document.getElementById("modalPasso").style.display = "block");
+
+  const modalPasso = document.getElementById("modalPasso");
+  const closeBtn = modalPasso.querySelector(".close");
+
+  closeBtn.onclick = () => {
+    modalPasso.style.display = "none";
+  };
+
+  window.addEventListener("click", (event) => {
+    if (event.target === modalPasso) {
+      modalPasso.style.display = "none";
+    }
+  });
 }
 
 async function converterCenasParaDataURL() {
