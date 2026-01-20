@@ -323,7 +323,7 @@ async function salvarNoSupabase() {
     const {
       data: { user },
     } = await supabaseClient.auth.getUser();
-    showLoading("Publicando no dashboard...");
+    showLoading("Salvando Panorama...");
 
     // 1. Garantir que todas as imagens estão em DataURL (Base64)
     await converterCenasParaDataURL();
