@@ -58,7 +58,7 @@ async function fetchPanoramas(userId) {
 
   const { data, error } = await supabaseClient
     .from("panoramas")
-    .select("*")
+    .select("id, created_at, thumb_url, nome_projeto, pasta_nome")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -159,19 +159,33 @@ window.copiarLinkTour = function (tourId) {
 // DELETAR PANORAMA
 // ===============================
 window.deletarPanorama = async function (id, pastaNome) {
-  if (!confirm("Deseja excluir este panorama?")) return;
+  if (!confirm("Deseja excluir este panorama permanentemente?")) return;
 
-  const {
-    data: { user },
-  } = await supabaseClient.auth.getUser();
+  const { data: { user } } = await supabaseClient.auth.getUser();
 
-  await supabaseClient.from("panoramas").delete().eq("id", id);
-
-  await supabaseClient.storage
+  // 1. Deleta do Banco de Dados
+  const { error: dbError } = await supabaseClient
     .from("panoramas")
-    .remove([`${user.id}/${pastaNome}/index.html`]);
+    .delete()
+    .eq("id", id);
 
-  alert("Panorama excluído com sucesso!");
+  if (dbError) {
+    alert("Erro ao excluir registro do banco.");
+    return;
+  }
+
+  // 2. Tenta listar e remover todos os arquivos da pasta no Storage
+  // (O Supabase exige o caminho completo dos arquivos para deletar)
+  const { data: files } = await supabaseClient.storage
+    .from("panoramas")
+    .list(`${user.id}/${pastaNome}`);
+
+  if (files && files.length > 0) {
+    const filesToRemove = files.map(f => `${user.id}/${pastaNome}/${f.name}`);
+    await supabaseClient.storage.from("panoramas").remove(filesToRemove);
+  }
+
+  alert("Panorama e arquivos excluídos com sucesso!");
   location.reload();
 };
 
