@@ -58,7 +58,7 @@ async function fetchPanoramas(userId) {
 
   const { data, error } = await supabaseClient
     .from("panoramas")
-    .select("id, created_at, thumb_url, nome_projeto, pasta_nome")
+    .select("id, created_at, thumb_url, nome_projeto, pasta_nome, pago")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -95,6 +95,10 @@ function renderPanoramas(list) {
 
     const dataCriacao = new Date(item.created_at).toLocaleDateString("pt-BR");
 
+    // Configurações de Status
+    const statusTexto = item.pago ? "Pago ✅" : "Aguardando Pagamento ⏳";
+    const statusCor = item.pago ? "#28a745" : "#dc3545";
+
     card.innerHTML = `
       <div class="card-thumb"
            style="background-image:url('${item.thumb_url}');
@@ -108,21 +112,37 @@ function renderPanoramas(list) {
           ${item.nome_projeto}
         </h3>
 
-        <p style="font-size:12px;color:#666">
+        <p style="font-size:12px;color:#666; margin-bottom: 5px;">
           Criado em: ${dataCriacao}
+        </p>
+
+        <p style="font-size:13px; font-weight:bold; color:${statusCor}; margin: 5px 0 12px 0;">
+          Status: ${statusTexto}
         </p>
 
         <div class="card-actions"
              style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
           
-          <button class="btn-primary"
-                  onclick="visualizarTour('${item.id}')">
+          <button class="btn-primary" onclick="visualizarTour('${item.id}')">
             Visualizar
           </button>
 
-          <button class="btn-secondary"
-                onclick="copiarLinkTour('${item.id}')">
-          Copiar Link
+         <button class="btn-secondary"
+      style="${!item.pago ? "opacity: 0.5; cursor: not-allowed; filter: grayscale(1);" : ""}"
+      onclick="${
+        item.pago
+          ? `showModal('Sucesso!', 'Este item já foi pago e o link está disponível.', '✅', true); copiarLinkTour('${item.id}')`
+          : `showModal('Acesso Bloqueado', 'Você ainda não possui acesso a este panorama. Realize o pagamento para liberar o link.', '🔒', false)`
+      }">
+  Copiar Link
+</button>
+
+        <button class="btn-secondary" onclick="${
+          item.pago
+            ? `showModal('Sucesso!', 'Este item já foi pago e o link está disponível.', '✅');`
+            : `showModal('Acesso Bloqueado', 'Realize o pagamento para liberar o link deste panorama.', '🔒')`
+        }">
+          Pagar
         </button>
 
           <button class="btn-danger"
@@ -147,11 +167,8 @@ window.copiarLinkTour = function (tourId) {
 
   navigator.clipboard
     .writeText(link)
-    .then(() => {
-      alert("🔗 Link copiado com sucesso!");
-    })
+    .then(() => {})
     .catch(() => {
-      alert("Erro ao copiar o link.");
     });
 };
 
@@ -161,7 +178,9 @@ window.copiarLinkTour = function (tourId) {
 window.deletarPanorama = async function (id, pastaNome) {
   if (!confirm("Deseja excluir este panorama permanentemente?")) return;
 
-  const { data: { user } } = await supabaseClient.auth.getUser();
+  const {
+    data: { user },
+  } = await supabaseClient.auth.getUser();
 
   // 1. Deleta do Banco de Dados
   const { error: dbError } = await supabaseClient
@@ -181,7 +200,7 @@ window.deletarPanorama = async function (id, pastaNome) {
     .list(`${user.id}/${pastaNome}`);
 
   if (files && files.length > 0) {
-    const filesToRemove = files.map(f => `${user.id}/${pastaNome}/${f.name}`);
+    const filesToRemove = files.map((f) => `${user.id}/${pastaNome}/${f.name}`);
     await supabaseClient.storage.from("panoramas").remove(filesToRemove);
   }
 
@@ -202,4 +221,41 @@ btnLogout.addEventListener("click", async () => {
 // ===============================
 window.visualizarTour = function (tourId) {
   window.open(`/pages/viewer.html?tourId=${tourId}`, "_blank");
+};
+
+window.showModal = function (titulo, mensagem, icone, isPago) {
+  const modal = document.getElementById("custom-modal");
+  const footer = document.getElementById("modal-footer");
+
+  document.getElementById("modal-title").innerText = titulo;
+  document.getElementById("modal-message").innerText = mensagem;
+  document.getElementById("modal-icon").innerText = icone;
+
+  // Limpa os botões anteriores
+  footer.innerHTML = "";
+
+  if (!isPago) {
+    // Se NÃO estiver pago, adiciona o botão de Pagar
+    const btnPagar = document.createElement("button");
+    btnPagar.className = "btn-primary"; // Use sua classe de CSS de destaque
+    btnPagar.innerText = "Pagar Agora 💳";
+    btnPagar.onclick = () => {
+      alert("Redirecionando para o checkout..."); // Aqui você colocará o link de pagamento no futuro
+    };
+    footer.appendChild(btnPagar);
+  }
+
+  // Botão de fechar (sempre presente)
+  const btnFechar = document.createElement("button");
+  btnFechar.className = "btn-secondary";
+  btnFechar.style.width = "100%";
+  btnFechar.innerText = "Fechar";
+  btnFechar.onclick = closeModal;
+  footer.appendChild(btnFechar);
+
+  modal.style.display = "flex";
+};
+
+window.closeModal = function () {
+  document.getElementById("custom-modal").style.display = "none";
 };
