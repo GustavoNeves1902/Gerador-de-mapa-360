@@ -120,36 +120,38 @@ function renderPanoramas(list) {
           Status: ${statusTexto}
         </p>
 
-        <div class="card-actions"
-             style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <div class="card-actions" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
           
-          <button class="btn-primary" onclick="visualizarTour('${item.id}')">
-            Visualizar
-          </button>
+    <button class="btn-primary" onclick="visualizarTour('${item.id}')">
+        Visualizar
+    </button>
 
-         <button class="btn-secondary"
-      style="${!item.pago ? "opacity: 0.5; cursor: not-allowed; filter: grayscale(1);" : ""}"
-      onclick="${
-        item.pago
-          ? `showModal('Sucesso!', 'Este item já foi pago e o link está disponível.', '✅', true); copiarLinkTour('${item.id}')`
-          : `showModal('Acesso Bloqueado', 'Você ainda não possui acesso a este panorama. Realize o pagamento para liberar o link.', '🔒', false)`
-      }">
-  Copiar Link
-</button>
-
-        <button class="btn-secondary" onclick="${
+    <button class="btn-secondary"
+        style="${!item.pago ? "opacity: 0.5; cursor: not-allowed; filter: grayscale(1);" : ""}"
+        onclick="${
           item.pago
-            ? `showModal('Sucesso!', 'Este item já foi pago e o link está disponível.', '✅');`
-            : `showModal('Acesso Bloqueado', 'Realize o pagamento para liberar o link deste panorama.', '🔒')`
+            ? `showModal('Sucesso!', 'Este item já foi pago e o link está disponível.', '✅', true); copiarLinkTour('${item.id}')`
+            : `showModal('Acesso Bloqueado', 'Você ainda não possui acesso a este panorama. Realize o pagamento para liberar o link.', '🔒', false)`
         }">
-          Pagar
-        </button>
+        Copiar Link
+    </button>
 
-          <button class="btn-danger"
-                  onclick="deletarPanorama('${item.id}','${item.pasta_nome}')">
-            Excluir
-          </button>
-        </div>
+    ${
+      !item.pago
+        ? `
+        <button class="btn-secondary" style="background-color: green; color: white;" 
+            onclick="showModal('Acesso Bloqueado', 'Realize o pagamento para liberar o link deste panorama.', '🔒', false)">
+            Pagar
+        </button>
+    `
+        : ""
+    }
+
+    <button class="btn-danger" style="background-color: red;"
+            onclick="deletarPanorama('${item.id}','${item.pasta_nome}')">
+        Excluir
+    </button>
+</div>
       </div>
     `;
 
@@ -168,8 +170,7 @@ window.copiarLinkTour = function (tourId) {
   navigator.clipboard
     .writeText(link)
     .then(() => {})
-    .catch(() => {
-    });
+    .catch(() => {});
 };
 
 // ===============================
