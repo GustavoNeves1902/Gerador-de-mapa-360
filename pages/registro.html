@@ -1,54 +1,80 @@
 <!DOCTYPE html>
 <html lang="pt-br">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cadastro - 360 Panorama Pro</title>
-    <link rel="stylesheet" href="/styles/registro.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-</head>
+    <link rel="stylesheet" href="/styles/registro.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
 
-<body>
-    <div class="signup-container">
-        <div class="signup-card">
-            <h1>Criar Conta</h1>
-            <p>Junte-se à plataforma e comece a criar seus tours 360º.</p>
+  <body>
+    <header>
+      <nav style="background-color: rgb(255, 255, 255); border-radius: 20px">
+        <img src="/Logo.png" width="80px" />
+      </nav>
+    </header>
+    
+    <div class="main-content signup-container">
+      <div class="signup-card">
+        <h1>Criar Conta</h1>
+        <p>Junte-se à plataforma e comece a criar seus tours 360º.</p>
 
-            <form id="signup-form">
-                <div class="input-group">
-                    <label for="company">Nome da Imobiliária</label>
-                    <input type="text" id="company" placeholder="Ex: Imobiliária Silva" required>
-                </div>
+        <form id="signup-form">
+          <div class="input-group">
+            <label for="company">Nome da Imobiliária</label>
+            <input
+              type="text"
+              id="company"
+              placeholder="Ex: Imobiliária Silva"
+              required
+            />
+          </div>
 
-                <div class="input-group">
-                    <label for="email">E-mail Corporativo</label>
-                    <input type="email" id="email" placeholder="contato@empresa.com" required>
-                </div>
+          <div class="input-group">
+            <label for="email">E-mail Corporativo</label>
+            <input
+              type="email"
+              id="email"
+              placeholder="contato@empresa.com"
+              required
+            />
+          </div>
 
-                <div class="input-row">
-                    <div class="input-group">
-                        <label for="password">Senha</label>
-                        <input type="password" id="password" placeholder="••••••••" required>
-                    </div>
-                    <div class="input-group">
-                        <label for="confirm-password">Confirmar Senha</label>
-                        <input type="password" id="confirm-password" placeholder="••••••••" required>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-primary">Criar Cadastro</button>
-            </form>
-
-            <div class="footer-text">
-                Já tem uma conta? <a href="/pages/login.html">Fazer login</a>
+          <div class="input-row">
+            <div class="input-group">
+              <label for="password">Senha</label>
+              <input
+                type="password"
+                id="password"
+                placeholder="••••••••"
+                required
+              />
             </div>
+            <div class="input-group">
+              <label for="confirm-password">Confirmar Senha</label>
+              <input
+                type="password"
+                id="confirm-password"
+                placeholder="••••••••"
+                required
+              />
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary">Criar Cadastro</button>
+        </form>
+
+        <div class="footer-text">
+          Já tem uma conta? <a href="/pages/login.html">Fazer login</a>
         </div>
+      </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/scripts/supabase.js"></script>
     <script src="/scripts/registro.js"></script>
-
-</body>
-
+  </body>
 </html>
