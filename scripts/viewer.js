@@ -1,105 +1,713 @@
-// viewer.js
 const supabaseClient = window.supabaseClient;
 
-// =========================
-// Utils
-// =========================
-function getPanoramaIdFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("tourId");
+let viewer;
+let scenes = {};
+let currentScene = null;
+let addingHotspot = false;
+let hotspotEmEdicao = null;
+
+let tempHotspotCoords = null;
+let movendoHotspot = false;
+
+// ---------- UI: showAlert ----------
+window.showAlert = function (mensagem) {
+  const modal = document.getElementById("customAlert");
+  const msg = document.getElementById("customAlertMsg");
+  const btn = document.getElementById("customAlertBtn");
+
+  if (!modal) return;
+
+  msg.textContent = mensagem;
+
+  btn.style.display = "block";
+  btn.disabled = false;
+  btn.onclick = () => (modal.style.display = "none");
+
+  modal.style.display = "flex";
+};
+
+window.showLoading = function (mensagem = "Aguarde...") {
+  const modal = document.getElementById("customAlert");
+  const msg = document.getElementById("customAlertMsg");
+  const btn = document.getElementById("customAlertBtn");
+
+  if (!modal) return;
+
+  msg.textContent = mensagem;
+
+  // 🔒 bloqueia o botão
+  btn.style.display = "none";
+  btn.disabled = true;
+
+  modal.style.display = "flex";
+};
+
+window.hideLoading = function () {
+  const modal = document.getElementById("customAlert");
+  if (!modal) return;
+
+  modal.style.display = "none";
+};
+
+(function attachGlobalModalClick() {
+  window.addEventListener("click", (event) => {
+    const modal = document.getElementById("customAlert");
+    const btn = document.getElementById("customAlertBtn");
+
+    // só permite fechar se o botão estiver visível (modo alerta)
+    if (event.target === modal && btn.style.display !== "none") {
+      modal.style.display = "none";
+    }
+  });
+})();
+
+// No clique do botão Reposicionar
+document.getElementById("btnReposicionar").onclick = () => {
+  document.getElementById("modalHotspot").style.display = "none"; // Fecha o modal temporariamente
+  movendoHotspot = true;
+  showAlert("Clique no novo local do panorama para mover o hotspot.");
+};
+
+// ---------- Criação / (Re)configuração do viewer ----------
+let mouseDownPos = { x: 0, y: 0 };
+
+function setupViewer(initialScenes = {}) {
+  try {
+    if (viewer && typeof viewer.destroy === "function") viewer.destroy();
+  } catch (e) {}
+
+  viewer = pannellum.viewer("viewer", {
+    default: { firstScene: null, autoLoad: true },
+    scenes: initialScenes,
+  });
+
+  viewer.on("mousedown", (event) => {
+    mouseDownPos = { x: event.clientX, y: event.clientY };
+  });
+
+  viewer.on("mouseup", (event) => {
+    // 1. Verifica se estamos em algum modo de interação (Adicionar ou Mover)
+    // Se não estivermos em nenhum dos dois, ignora o clique
+    if (!addingHotspot && !movendoHotspot) return;
+    if (!currentScene) return;
+
+    const moveX = Math.abs(event.clientX - mouseDownPos.x);
+    const moveY = Math.abs(event.clientY - mouseDownPos.y);
+    if (moveX > 5 || moveY > 5) return;
+
+    const coords = viewer.mouseEventToCoords(event);
+
+    // 2. SITUAÇÃO A: Reposicionando um hotspot existente
+    if (movendoHotspot && hotspotEmEdicao) {
+      const h = scenes[currentScene].hotSpots.find(
+        (h) => h.id === hotspotEmEdicao
+      );
+      if (h) {
+        h.pitch = coords[0];
+        h.yaw = coords[1];
+
+        movendoHotspot = false;
+        rebuildViewerFromScenes();
+        abrirModalHotspot(true, h); // Reabre o modal para salvar as mudanças
+      }
+      return;
+    }
+
+    // 3. SITUAÇÃO B: Adicionando um hotspot novo
+    if (addingHotspot) {
+      tempHotspotCoords = { pitch: coords[0], yaw: coords[1] };
+      abrirModalHotspot();
+    }
+  });
+
+  viewer.on("scenechange", (sceneId) => {
+    currentScene = sceneId;
+    atualizarListaHotspots();
+    atualizarListaCenas();
+  });
 }
 
-// =========================
-// Renderização
-// =========================
-function renderizarPanorama(estruturaJson) {
-  if (!estruturaJson || Object.keys(estruturaJson).length === 0) {
-    alert("Panorama vazio ou inválido.");
-    return;
+function abrirModalHotspot(isEdicao = false, hotspotData = null) {
+  const modal = document.getElementById("modalHotspot");
+  const select = document.getElementById("selectDestino");
+  const inputYaw = document.getElementById("inputTargetYaw");
+
+  select.innerHTML = "";
+  Object.keys(scenes).forEach((id) => {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = scenes[id].nome || id;
+    select.appendChild(opt);
+  });
+
+  if (isEdicao && hotspotData) {
+    select.value = hotspotData.sceneId;
+    inputYaw.value = hotspotData.targetYaw || 0;
+    hotspotEmEdicao = hotspotData.id;
+  } else {
+    inputYaw.value = "0";
+    hotspotEmEdicao = null;
   }
 
-  const scenes = {};
-  let firstScene = null;
+  modal.style.display = "flex";
+}
 
-  Object.keys(estruturaJson).forEach((id) => {
-    const cena = estruturaJson[id];
-    if (!cena?.dataURL) return;
+// Configuração dos cliques dos botões (coloque isso dentro do seu bindUI ou no escopo global)
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("btnCancelarHotspot").onclick = () => {
+    document.getElementById("modalHotspot").style.display = "none";
+    addingHotspot = false;
+  };
 
-    if (!firstScene) firstScene = id;
+  document.getElementById("btnSalvarHotspot").onclick = () => {
+    const destino = document.getElementById("selectDestino").value;
+    const targetYaw =
+      parseFloat(document.getElementById("inputTargetYaw").value) || 0;
 
-    scenes[id] = {
+    if (!destino) return showAlert("Selecione um destino.");
+
+    if (hotspotEmEdicao) {
+      // Edição
+      const h = scenes[currentScene].hotSpots.find(
+        (h) => h.id === hotspotEmEdicao
+      );
+      if (h) {
+        h.sceneId = destino;
+        h.targetYaw = targetYaw;
+        h.text = encodeURIComponent(
+          `Ir para ${scenes[destino].nome || destino}`
+        );
+      }
+      rebuildViewerFromScenes();
+    } else {
+      // Novo
+      const hotspotId = "hspot_" + Date.now();
+      const hotspot = {
+        id: hotspotId,
+        pitch: tempHotspotCoords.pitch,
+        yaw: tempHotspotCoords.yaw,
+        type: "scene",
+        text: encodeURIComponent(`Ir para ${scenes[destino].nome || destino}`),
+        sceneId: destino,
+        targetYaw: targetYaw,
+      };
+      scenes[currentScene].hotSpots.push(hotspot);
+      viewer.addHotSpot(
+        { ...hotspot, text: decodeURIComponent(hotspot.text) },
+        currentScene
+      );
+    }
+
+    document.getElementById("modalHotspot").style.display = "none";
+    addingHotspot = false;
+    atualizarListaHotspots();
+  };
+});
+
+// ---------- Inicialização ----------
+window.addEventListener("DOMContentLoaded", async () => {
+  const {
+    data: { user },
+  } = await supabaseClient.auth.getUser();
+  if (!user) {
+    window.location.href = "login.html";
+    return;
+  }
+  setupViewer({});
+  bindUI();
+});
+
+function bindUI() {
+  document.getElementById("addScene").addEventListener("click", onAddScene);
+  document.getElementById("removeScene").addEventListener("click", () => {
+    if (!currentScene) return showAlert("Nenhuma cena ativa.");
+    removerCena(currentScene);
+  });
+  document.getElementById("addHotspot").addEventListener("click", () => {
+    if (!currentScene) return showAlert("Carregue uma cena primeiro.");
+    addingHotspot = true;
+    showAlert("Modo hotspot: clique no panorama.");
+  });
+  document
+    .getElementById("salvarPlataforma")
+    .addEventListener("click", salvarNoSupabase);
+
+  const btnPasso = document.getElementById("passoAPasso");
+  if (btnPasso)
+    btnPasso.onclick = () =>
+      (document.getElementById("modalPasso").style.display = "block");
+
+  const modalPasso = document.getElementById("modalPasso");
+  const closeBtn = modalPasso.querySelector(".close");
+
+  closeBtn.onclick = () => {
+    modalPasso.style.display = "none";
+  };
+
+  window.addEventListener("click", (event) => {
+    if (event.target === modalPasso) {
+      modalPasso.style.display = "none";
+    }
+  });
+}
+
+async function converterCenasParaDataURL() {
+  const promises = [];
+
+  for (const id in scenes) {
+    const scene = scenes[id];
+
+    if (scene.file && !scene.dataURL) {
+      promises.push(
+        new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            scene.dataURL = e.target.result;
+            resolve();
+          };
+          reader.readAsDataURL(scene.file);
+        })
+      );
+    }
+  }
+
+  return Promise.all(promises);
+}
+
+function baixarArquivo(blob) {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "panorama_360.zip";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function gerarHTMLCompleto() {
+  const scenesData = {};
+  let firstSceneId = null;
+
+  for (const id in scenes) {
+    const s = scenes[id];
+    if (!firstSceneId) firstSceneId = id;
+
+    scenesData[id] = {
       type: "equirectangular",
-      panorama: cena.dataURL,
-      hotSpots: (cena.hotSpots || []).map((h) => ({
-        id: h.id,
+      panorama: s.dataURL,
+      nome: encodeURIComponent(s.nome || id),
+      hotSpots: (s.hotSpots || []).map((h) => ({
         pitch: h.pitch,
         yaw: h.yaw,
-        type: "scene",
+        type: h.type,
+        text: h.text,
         sceneId: h.sceneId,
-        targetYaw: h.targetYaw ?? 0,
-        text: decodeURIComponent(h.text || ""),
+        targetYaw: h.targetYaw,
       })),
     };
-  });
-
-  const viewer = pannellum.viewer("viewer", {
-    default: {
-      firstScene,
-      autoLoad: true,
-    },
-    scenes,
-  });
-
-  // ===== MENU DE CENAS =====
-  const menu = document.getElementById("sceneMenu");
-  const select = document.getElementById("sceneSelect");
-
-  if (menu && select) {
-    Object.keys(scenes).forEach((id) => {
-      const opt = document.createElement("option");
-      opt.value = id;
-      opt.textContent = id;
-      select.appendChild(opt);
-    });
-
-    select.value = firstScene;
-    select.onchange = () => viewer.loadScene(select.value);
-    menu.style.display = "block";
   }
 
-  const loading = document.getElementById("loading");
-  if (loading) loading.style.display = "none";
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>Panorama 360</title>
+
+<link rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css" />
+<script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+
+<style>
+body { margin:0; overflow:hidden; background:#000 }
+#viewer { width:100%; height:100vh }
+#menu {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 9999;
+  background: rgba(0,0,0,.6);
+  padding: 6px;
+  border-radius: 6px;
+}
+#menu label { color:white; font-weight:bold }
+</style>
+</head>
+
+<body>
+
+<div id="menu">
+  <label>Ir para:</label>
+  <select id="jump"></select>
+</div>
+
+<div id="viewer"></div>
+
+<script>
+const scenes = ${JSON.stringify(scenesData)};
+
+Object.values(scenes).forEach(s => {
+  s.hotSpots.forEach(h => h.text = decodeURIComponent(h.text));
+});
+
+const viewer = pannellum.viewer("viewer", {
+  default: {
+    firstScene: "${firstSceneId}",
+    autoLoad: true
+  },
+  scenes
+});
+
+const select = document.getElementById("jump");
+Object.keys(scenes).forEach(id => {
+  const opt = document.createElement("option");
+  opt.value = id;
+  opt.textContent = decodeURIComponent(scenes[id].nome);
+  select.appendChild(opt);
+});
+
+select.value = "${firstSceneId}";
+select.onchange = () => viewer.loadScene(select.value);
+</script>
+
+</body>
+</html>
+`;
 }
 
-// =========================
-// Carregar do Supabase
-// =========================
-async function carregarPanorama() {
-  const panoramaId = getPanoramaIdFromUrl();
+// ---------- SALVAR NO SUPABASE ----------
+async function salvarNoSupabase() {
+  if (Object.keys(scenes).length === 0)
+    return showAlert("Adicione pelo menos uma cena!");
 
-  if (!panoramaId) {
-    alert("ID do panorama não informado.");
+  try {
+    const {
+      data: { user },
+    } = await supabaseClient.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado.");
+
+    showLoading(
+      "Otimizando e enviando imagens... (Isso pode levar alguns segundos)"
+    );
+
+    const nomeProjeto = document.getElementById("nome").value || "Tour 360";
+    const folderName = `tour_${Date.now()}`;
+    const bucket = "panoramas";
+
+    const estruturaParaBanco = {};
+
+    // 1. Loop para Processar, Comprimir e Subir cada cena
+    for (const id in scenes) {
+      const s = scenes[id];
+
+      // Otimiza a imagem (4K e 80% qualidade) para carregar rápido no visualizador
+      const blobOtimizado = await otimizarImagem(s.dataURL, 4096, 0.8);
+
+      const fileName = `${id}_panorama.jpg`;
+      const filePath = `${user.id}/${folderName}/scenes/${fileName}`;
+
+      // Upload para o Storage
+      const { error: uploadError } = await supabaseClient.storage
+        .from(bucket)
+        .upload(filePath, blobOtimizado, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
+
+      if (uploadError)
+        throw new Error(`Erro no upload da cena ${id}: ${uploadError.message}`);
+
+      // Obtém a URL pública
+      const { data: urlData } = supabaseClient.storage
+        .from(bucket)
+        .getPublicUrl(filePath);
+
+      // Monta o objeto da cena com a URL (muito mais leve que Base64)
+      estruturaParaBanco[id] = {
+        type: s.type,
+        nome: s.nome,
+        panorama: urlData.publicUrl,
+        hotSpots: s.hotSpots || [],
+      };
+    }
+
+    // 2. Criar e subir o arquivo index.html estático para o Storage
+    const htmlFinal = gerarHTMLComUrls(
+      estruturaParaBanco,
+      Object.keys(estruturaParaBanco)[0]
+    );
+    const htmlPath = `${user.id}/${folderName}/index.html`;
+    const htmlBlob = new Blob([htmlFinal], { type: "text/html" });
+
+    await supabaseClient.storage.from(bucket).upload(htmlPath, htmlBlob, {
+      contentType: "text/html",
+      upsert: true,
+    });
+
+    const { data: indexUrlData } = supabaseClient.storage
+      .from(bucket)
+      .getPublicUrl(htmlPath);
+
+    // 3. Salvar o registro final na tabela do Banco de Dados
+    // payload agora é minúsculo pois não contém imagens em texto
+    const { error: dbError } = await supabaseClient.from("panoramas").insert([
+      {
+        user_id: user.id,
+        nome_projeto: nomeProjeto,
+        pasta_nome: folderName,
+        url_index: indexUrlData.publicUrl,
+        // Usamos a URL da primeira cena como thumbnail
+        thumb_url:
+          estruturaParaBanco[Object.keys(estruturaParaBanco)[0]].panorama,
+        estrutura_json: estruturaParaBanco,
+        pago: false, // Começa como não pago por padrão
+      },
+    ]);
+
+    if (dbError) throw dbError;
+
+    hideLoading();
+    showAlert("✅ Tour publicado e otimizado com sucesso!");
+
+    // Pequeno delay para o usuário ler o alerta antes de redirecionar
+    setTimeout(() => (window.location.href = "dashboard.html"), 1500);
+  } catch (err) {
+    console.error("Erro completo:", err);
+    hideLoading();
+    showAlert("Erro ao salvar: " + err.message);
+  }
+}
+
+// Função auxiliar para o arquivo HTML que vai para o Storage
+function gerarHTMLComUrls(scenesData, firstSceneId) {
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Tour 360</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+  <style>body { margin:0; } #viewer { width:100%; height:100vh; }</style>
+</head>
+<body>
+  <div id="viewer"></div>
+  <script>
+    pannellum.viewer('viewer', {
+      default: { firstScene: '${firstSceneId}', autoLoad: true },
+      scenes: ${JSON.stringify(scenesData)}
+    });
+  </script>
+</body>
+</html>`;
+}
+
+// Função auxiliar para gerar o HTML usando URLs de imagem
+function gerarHTMLComUrls(scenesData, firstSceneId) {
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css" />
+<script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+<style>body { margin:0; } #viewer { width:100%; height:100vh }</style>
+</head>
+<body>
+<div id="viewer"></div>
+<script>
+  const viewer = pannellum.viewer("viewer", {
+    default: { firstScene: "${firstSceneId}", autoLoad: true },
+    scenes: ${JSON.stringify(scenesData)}
+  });
+</script>
+</body>
+</html>`;
+}
+
+// ---------- Lógica de Cenas e Hotspots (Sua Lógica Original) ----------
+function onAddScene() {
+  const fileInput = document.getElementById("fileInput");
+  const id = document.getElementById("imageId").value.trim();
+  if (!fileInput.files[0] || !id) return showAlert("Selecione imagem e ID.");
+
+  if (scenes[id]) {
+    return showAlert(
+      `O ID "${id}" já está em uso. Escolha um nome diferente para esta cena.`
+    );
+  }
+
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    scenes[id] = {
+      type: "equirectangular",
+      nome: file.name.replace(/\.[^/.]+$/, ""),
+      file,
+      dataURL: e.target.result,
+      hotSpots: [],
+    };
+    viewer.addScene(id, {
+      type: "equirectangular",
+      panorama: e.target.result,
+      hotSpots: [],
+    });
+    if (!currentScene) {
+      viewer.loadScene(id);
+      currentScene = id;
+    }
+    atualizarListaCenas();
+  };
+  reader.readAsDataURL(file);
+}
+
+function rebuildViewerFromScenes() {
+  const configScenes = {};
+  for (const id in scenes) {
+    configScenes[id] = {
+      type: "equirectangular",
+      panorama: scenes[id].dataURL,
+      hotSpots: scenes[id].hotSpots.map((h) => ({
+        ...h,
+        text: decodeURIComponent(h.text),
+      })),
+    };
+  }
+
+  setupViewer(configScenes);
+
+  // 🔥 ISSO É O QUE ESTAVA FALTANDO
+  if (currentScene && scenes[currentScene]) {
+    viewer.loadScene(currentScene);
+  }
+}
+
+window.removerHotspot = function (hotSpotId) {
+  if (!confirm(`Remover hotspot?`)) return;
+  scenes[currentScene].hotSpots = scenes[currentScene].hotSpots.filter(
+    (h) => h.id !== hotSpotId
+  );
+  try {
+    viewer.removeHotSpot(hotSpotId, currentScene);
+  } catch (e) {}
+  atualizarListaHotspots();
+};
+
+window.editarHotspot = function (hotSpotId) {
+  // Busca os dados do hotspot atual dentro da cena ativa
+  const h = scenes[currentScene].hotSpots.find((h) => h.id === hotSpotId);
+  if (!h) return;
+
+  // Em vez de prompts, chamamos a função que abre o Modal
+  // Passamos 'true' para indicar que é edição e os dados 'h'
+  abrirModalHotspot(true, h);
+};
+
+function atualizarListaHotspots() {
+  let container = document.getElementById("hotspotListContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "hotspotListContainer";
+    document.body.insertBefore(container, document.getElementById("viewer"));
+  }
+  container.innerHTML = `<h4>Hotspots em "${currentScene}":</h4>`;
+  const ul = document.createElement("ul");
+  (scenes[currentScene]?.hotSpots || []).forEach((h) => {
+    const li = document.createElement("li");
+    li.innerHTML = `→ ${h.sceneId} <button onclick="editarHotspot('${h.id}')">Editar</button> <button onclick="removerHotspot('${h.id}')">X</button>`;
+    ul.appendChild(li);
+  });
+  container.appendChild(ul);
+}
+
+function atualizarListaCenas() {
+  let container = document.getElementById("sceneSelectContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "sceneSelectContainer";
+    document.body.insertBefore(container, document.getElementById("viewer"));
+  }
+  container.innerHTML = `<label>Trocar cena: </label>`;
+  const select = document.createElement("select");
+  Object.keys(scenes).forEach((id) => {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = scenes[id].nome || id;
+    if (id === currentScene) opt.selected = true;
+    select.appendChild(opt);
+  });
+  select.onchange = (e) => viewer.loadScene(e.target.value);
+  container.appendChild(select);
+}
+
+async function otimizarImagem(dataURL, larguraAlvo = 4096, qualidade = 0.75) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      // Mantém a proporção (geralmente 2:1 para 360º)
+      const escala = larguraAlvo / img.width;
+      canvas.width = larguraAlvo;
+      canvas.height = img.height * escala;
+
+      // Desenha a imagem redimensionada no canvas
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // Transforma em Blob com compressão JPEG
+      canvas.toBlob(
+        (blob) => {
+          resolve(blob);
+        },
+        "image/jpeg",
+        qualidade
+      );
+    };
+    img.src = dataURL;
+  });
+}
+
+function removerCena(id) {
+  if (!id || !scenes[id]) {
+    showAlert("Cena inválida.");
     return;
   }
 
-  try {
-    const { data, error } = await supabaseClient
-      .from("panoramas")
-      .select("estrutura_json")
-      .eq("id", panoramaId)
-      .single();
+  if (!confirm(`Remover cena '${scenes[id].nome || id}'?`)) return;
 
-    if (error) throw error;
-    if (!data?.estrutura_json) throw new Error("Estrutura não encontrada.");
+  // 1. Remove a cena
+  delete scenes[id];
 
-    renderizarPanorama(data.estrutura_json);
-  } catch (err) {
-    console.error(err);
-    alert("Erro ao carregar panorama.");
+  // 2. Remove hotspots de outras cenas que apontavam para ela
+  for (const sceneId in scenes) {
+    scenes[sceneId].hotSpots = scenes[sceneId].hotSpots.filter(
+      (h) => h.sceneId !== id
+    );
   }
-}
 
-// =========================
-// Init
-// =========================
-document.addEventListener("DOMContentLoaded", carregarPanorama);
+  // 3. Se não sobrou nenhuma cena
+  if (Object.keys(scenes).length === 0) {
+    currentScene = null;
+    setupViewer({});
+    atualizarListaCenas();
+    atualizarListaHotspots();
+    showAlert("Cena removida. Nenhuma cena restante.");
+    return;
+  }
+
+  // 4. Define nova cena ativa (primeira disponível)
+  currentScene = Object.keys(scenes)[0];
+
+  // 5. Reconstrói o viewer corretamente
+  rebuildViewerFromScenes();
+
+  try {
+    viewer.loadScene(currentScene);
+  } catch (e) {
+    console.warn("Erro ao carregar nova cena:", e);
+  }
+
+  atualizarListaCenas();
+  atualizarListaHotspots();
+  showAlert("Cena removida com sucesso!");
+}
