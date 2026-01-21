@@ -175,7 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
         h.sceneId = destino;
         h.targetYaw = targetYaw;
         h.text = encodeURIComponent(
-          `Ir para ${scenes[destino].nome || destino}`
+          `Ir para ${destino}`
         );
       }
       rebuildViewerFromScenes();
@@ -187,7 +187,7 @@ document.addEventListener("DOMContentLoaded", () => {
         pitch: tempHotspotCoords.pitch,
         yaw: tempHotspotCoords.yaw,
         type: "scene",
-        text: encodeURIComponent(`Ir para ${scenes[destino].nome || destino}`),
+        text: encodeURIComponent(`Ir para ${destino}`),
         sceneId: destino,
         targetYaw: targetYaw,
       };
@@ -541,7 +541,7 @@ function onAddScene() {
   reader.onload = (e) => {
     scenes[id] = {
       type: "equirectangular",
-      nome: file.name.replace(/\.[^/.]+$/, ""),
+      nome: id,
       file,
       dataURL: e.target.result,
       hotSpots: [],
@@ -631,7 +631,7 @@ function atualizarListaCenas() {
   Object.keys(scenes).forEach((id) => {
     const opt = document.createElement("option");
     opt.value = id;
-    opt.textContent = scenes[id].nome || id;
+    opt.textContent = id;
     if (id === currentScene) opt.selected = true;
     select.appendChild(opt);
   });
