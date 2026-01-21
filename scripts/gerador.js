@@ -383,63 +383,109 @@ async function salvarNoSupabase() {
     const {
       data: { user },
     } = await supabaseClient.auth.getUser();
-    showLoading("Salvando Panorama...");
+    showLoading("Fazendo upload das imagens e salvando...");
 
-    // 1. Garantir que todas as imagens estão em DataURL (Base64)
-    await converterCenasParaDataURL();
-
-    // 2. Definir o nome do projeto e o nome da pasta (ID Único)
     const nomeProjeto = document.getElementById("nome").value || "Tour 360";
-
-    // ESTA LINHA É A QUE ESTAVA FALTANDO OU COM ERRO:
     const folderName = `tour_${Date.now()}`;
 
-    // 3. Gerar o HTML (caso você ainda queira salvar o arquivo no Storage para visualização rápida)
-    const htmlFinal = gerarHTMLCompleto();
-    const filePath = `${user.id}/${folderName}/index.html`;
+    // Objeto onde vamos montar a estrutura final com URLs em vez de Base64
+    const estruturaParaBanco = {};
 
-    const blob = new Blob([htmlFinal], { type: "text/html" });
+    // 1. Loop para fazer upload de cada imagem de cena
+    for (const id in scenes) {
+      const s = scenes[id];
+      const fileName = `${id}_panorama.jpg`;
+      const filePath = `${user.id}/${folderName}/scenes/${fileName}`;
 
-    // Faz o upload para o Storage (opcional, mas bom para o botão "Visualizar")
-    await supabaseClient.storage.from("panoramas").upload(filePath, blob, {
+      // Converter o DataURL (Base64) de volta para um Blob/File para upload eficiente
+      const response = await fetch(s.dataURL);
+      const blob = await response.blob();
+
+      // Upload da imagem da cena para o Storage
+      const { error: uploadError } = await supabaseClient.storage
+        .from("panoramas")
+        .upload(filePath, blob, { contentType: "image/jpeg", upsert: true });
+
+      if (uploadError)
+        throw new Error(`Erro no upload da cena ${id}: ${uploadError.message}`);
+
+      // Pegar a URL pública da imagem recém-subida
+      const { data: urlData } = supabaseClient.storage
+        .from("panoramas")
+        .getPublicUrl(filePath);
+
+      // Montar a cena para o JSON do banco usando a URL
+      estruturaParaBanco[id] = {
+        type: s.type,
+        nome: s.nome,
+        panorama: urlData.publicUrl, // 🔥 AGORA É UMA URL, NÃO BASE64
+        hotSpots: s.hotSpots || [],
+      };
+    }
+
+    // 2. Gerar e salvar o index.html (Opcional, para visualização direta)
+    const htmlFinal = gerarHTMLComUrls(
+      estruturaParaBanco,
+      Object.keys(estruturaParaBanco)[0]
+    );
+    const htmlPath = `${user.id}/${folderName}/index.html`;
+    const htmlBlob = new Blob([htmlFinal], { type: "text/html" });
+
+    await supabaseClient.storage.from("panoramas").upload(htmlPath, htmlBlob, {
       contentType: "text/html",
       upsert: true,
     });
 
-    const { data: urlData } = supabaseClient.storage
+    const { data: indexUrl } = supabaseClient.storage
       .from("panoramas")
-      .getPublicUrl(filePath);
+      .getPublicUrl(htmlPath);
 
-    // 4. SALVAR NO BANCO DE DADOS
+    // 3. SALVAR NO BANCO DE DADOS (Payload agora é minúsculo!)
     const { error: dbError } = await supabaseClient.from("panoramas").insert([
       {
         user_id: user.id,
         nome_projeto: nomeProjeto,
-        pasta_nome: folderName, // <--- AQUI GARANTIMOS QUE O VALOR NÃO É NULL
-        url_index: urlData.publicUrl,
-        thumb_url: scenes[Object.keys(scenes)[0]].dataURL,
-        estrutura_json: Object.fromEntries(
-          Object.entries(scenes).map(([id, s]) => [
-            id,
-            {
-              type: s.type,
-              nome: s.nome,
-              dataURL: s.dataURL,
-              hotSpots: s.hotSpots || [],
-            },
-          ])
-        ), // Salvando o objeto completo para o ZIP na Dashboard
+        pasta_nome: folderName,
+        url_index: indexUrl.publicUrl,
+        thumb_url:
+          estruturaParaBanco[Object.keys(estruturaParaBanco)[0]].panorama,
+        estrutura_json: estruturaParaBanco, // JSON leve com URLs
       },
     ]);
 
     if (dbError) throw dbError;
+
     hideLoading();
-    showAlert("✅ Publicado com sucesso!");
+    showAlert("✅ Publicado com sucesso no Storage!");
     setTimeout(() => (window.location.href = "dashboard.html"), 1500);
   } catch (err) {
+    console.error(err);
     hideLoading();
-    showAlert("Erro: " + err.message);
+    showAlert("Erro ao salvar: " + err.message);
   }
+}
+
+// Função auxiliar para gerar o HTML usando URLs de imagem
+function gerarHTMLComUrls(scenesData, firstSceneId) {
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css" />
+<script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+<style>body { margin:0; } #viewer { width:100%; height:100vh }</style>
+</head>
+<body>
+<div id="viewer"></div>
+<script>
+  const viewer = pannellum.viewer("viewer", {
+    default: { firstScene: "${firstSceneId}", autoLoad: true },
+    scenes: ${JSON.stringify(scenesData)}
+  });
+</script>
+</body>
+</html>`;
 }
 
 // ---------- Lógica de Cenas e Hotspots (Sua Lógica Original) ----------
