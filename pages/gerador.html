@@ -197,6 +197,27 @@
       </button>
     </div>
   </div>
+
+  <div id="modalHotspot" class="custom-modal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); align-items:center; justify-content:center;">
+    <div style="background:white; padding:20px; border-radius:8px; width:300px; text-align:center;">
+      <h3 style="color: black;">Configurar Hotspot</h3>
+      
+      <label style="display:block; color:black; margin-top:10px;">Cena de Destino:</label>
+      <select id="selectDestino" style="width:100%; padding:8px; margin-top:5px;"></select>
+  
+      <label style="display:block; color:black; margin-top:15px;">Rotação da imagem de destino(0, 90, 180, 270):</label>
+      <input type="number" id="inputTargetYaw" value="0" style="width:90%; padding:8px; margin-top:5px;">
+      <button id="btnReposicionar" class="btn-secondary" style="padding:10px 20px; cursor:pointer; background:#f39c12; color:white; border:none; border-radius:4px;">
+        Mudar Posição
+      </button>
+      <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
+        <button id="btnSalvarHotspot" class="btn-primary" style="padding:10px 20px; cursor:pointer;">Salvar</button>
+        <button id="btnCancelarHotspot" style="padding:10px 20px; cursor:pointer;">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/scripts/supabase.js"></script>
   <script src="/scripts/gerador.js"></script>
