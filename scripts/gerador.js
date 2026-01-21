@@ -383,47 +383,54 @@ async function salvarNoSupabase() {
     const {
       data: { user },
     } = await supabaseClient.auth.getUser();
-    showLoading("Fazendo upload das imagens e salvando...");
+    if (!user) throw new Error("Usuário não autenticado.");
+
+    showLoading(
+      "Otimizando e enviando imagens... (Isso pode levar alguns segundos)"
+    );
 
     const nomeProjeto = document.getElementById("nome").value || "Tour 360";
     const folderName = `tour_${Date.now()}`;
+    const bucket = "panoramas";
 
-    // Objeto onde vamos montar a estrutura final com URLs em vez de Base64
     const estruturaParaBanco = {};
 
-    // 1. Loop para fazer upload de cada imagem de cena
+    // 1. Loop para Processar, Comprimir e Subir cada cena
     for (const id in scenes) {
       const s = scenes[id];
+
+      // Otimiza a imagem (4K e 80% qualidade) para carregar rápido no visualizador
+      const blobOtimizado = await otimizarImagem(s.dataURL, 4096, 0.8);
+
       const fileName = `${id}_panorama.jpg`;
       const filePath = `${user.id}/${folderName}/scenes/${fileName}`;
 
-      // Converter o DataURL (Base64) de volta para um Blob/File para upload eficiente
-      const response = await fetch(s.dataURL);
-      const blob = await response.blob();
-
-      // Upload da imagem da cena para o Storage
+      // Upload para o Storage
       const { error: uploadError } = await supabaseClient.storage
-        .from("panoramas")
-        .upload(filePath, blob, { contentType: "image/jpeg", upsert: true });
+        .from(bucket)
+        .upload(filePath, blobOtimizado, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
 
       if (uploadError)
         throw new Error(`Erro no upload da cena ${id}: ${uploadError.message}`);
 
-      // Pegar a URL pública da imagem recém-subida
+      // Obtém a URL pública
       const { data: urlData } = supabaseClient.storage
-        .from("panoramas")
+        .from(bucket)
         .getPublicUrl(filePath);
 
-      // Montar a cena para o JSON do banco usando a URL
+      // Monta o objeto da cena com a URL (muito mais leve que Base64)
       estruturaParaBanco[id] = {
         type: s.type,
         nome: s.nome,
-        panorama: urlData.publicUrl, // 🔥 AGORA É UMA URL, NÃO BASE64
+        panorama: urlData.publicUrl,
         hotSpots: s.hotSpots || [],
       };
     }
 
-    // 2. Gerar e salvar o index.html (Opcional, para visualização direta)
+    // 2. Criar e subir o arquivo index.html estático para o Storage
     const htmlFinal = gerarHTMLComUrls(
       estruturaParaBanco,
       Object.keys(estruturaParaBanco)[0]
@@ -431,38 +438,67 @@ async function salvarNoSupabase() {
     const htmlPath = `${user.id}/${folderName}/index.html`;
     const htmlBlob = new Blob([htmlFinal], { type: "text/html" });
 
-    await supabaseClient.storage.from("panoramas").upload(htmlPath, htmlBlob, {
+    await supabaseClient.storage.from(bucket).upload(htmlPath, htmlBlob, {
       contentType: "text/html",
       upsert: true,
     });
 
-    const { data: indexUrl } = supabaseClient.storage
-      .from("panoramas")
+    const { data: indexUrlData } = supabaseClient.storage
+      .from(bucket)
       .getPublicUrl(htmlPath);
 
-    // 3. SALVAR NO BANCO DE DADOS (Payload agora é minúsculo!)
+    // 3. Salvar o registro final na tabela do Banco de Dados
+    // payload agora é minúsculo pois não contém imagens em texto
     const { error: dbError } = await supabaseClient.from("panoramas").insert([
       {
         user_id: user.id,
         nome_projeto: nomeProjeto,
         pasta_nome: folderName,
-        url_index: indexUrl.publicUrl,
+        url_index: indexUrlData.publicUrl,
+        // Usamos a URL da primeira cena como thumbnail
         thumb_url:
           estruturaParaBanco[Object.keys(estruturaParaBanco)[0]].panorama,
-        estrutura_json: estruturaParaBanco, // JSON leve com URLs
+        estrutura_json: estruturaParaBanco,
+        pago: false, // Começa como não pago por padrão
       },
     ]);
 
     if (dbError) throw dbError;
 
     hideLoading();
-    showAlert("✅ Publicado com sucesso no Storage!");
+    showAlert("✅ Tour publicado e otimizado com sucesso!");
+
+    // Pequeno delay para o usuário ler o alerta antes de redirecionar
     setTimeout(() => (window.location.href = "dashboard.html"), 1500);
   } catch (err) {
-    console.error(err);
+    console.error("Erro completo:", err);
     hideLoading();
     showAlert("Erro ao salvar: " + err.message);
   }
+}
+
+// Função auxiliar para o arquivo HTML que vai para o Storage
+function gerarHTMLComUrls(scenesData, firstSceneId) {
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Tour 360</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+  <style>body { margin:0; } #viewer { width:100%; height:100vh; }</style>
+</head>
+<body>
+  <div id="viewer"></div>
+  <script>
+    pannellum.viewer('viewer', {
+      default: { firstScene: '${firstSceneId}', autoLoad: true },
+      scenes: ${JSON.stringify(scenesData)}
+    });
+  </script>
+</body>
+</html>`;
 }
 
 // Função auxiliar para gerar o HTML usando URLs de imagem
@@ -601,6 +637,34 @@ function atualizarListaCenas() {
   });
   select.onchange = (e) => viewer.loadScene(e.target.value);
   container.appendChild(select);
+}
+
+async function otimizarImagem(dataURL, larguraAlvo = 4096, qualidade = 0.75) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      // Mantém a proporção (geralmente 2:1 para 360º)
+      const escala = larguraAlvo / img.width;
+      canvas.width = larguraAlvo;
+      canvas.height = img.height * escala;
+
+      // Desenha a imagem redimensionada no canvas
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // Transforma em Blob com compressão JPEG
+      canvas.toBlob(
+        (blob) => {
+          resolve(blob);
+        },
+        "image/jpeg",
+        qualidade
+      );
+    };
+    img.src = dataURL;
+  });
 }
 
 function removerCena(id) {
