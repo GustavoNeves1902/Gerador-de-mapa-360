@@ -6,6 +6,9 @@ let currentScene = null;
 let addingHotspot = false;
 let hotspotEmEdicao = null;
 
+let tempHotspotCoords = null;
+let movendoHotspot = false;
+
 // ---------- UI: showAlert ----------
 window.showAlert = function (mensagem) {
   const modal = document.getElementById("customAlert");
@@ -58,6 +61,13 @@ window.hideLoading = function () {
   });
 })();
 
+// No clique do botão Reposicionar
+document.getElementById("btnReposicionar").onclick = () => {
+  document.getElementById("modalHotspot").style.display = "none"; // Fecha o modal temporariamente
+  movendoHotspot = true;
+  showAlert("Clique no novo local do panorama para mover o hotspot.");
+};
+
 // ---------- Criação / (Re)configuração do viewer ----------
 let mouseDownPos = { x: 0, y: 0 };
 
@@ -71,70 +81,43 @@ function setupViewer(initialScenes = {}) {
     scenes: initialScenes,
   });
 
-  // Registra onde o mouse desceu
   viewer.on("mousedown", (event) => {
     mouseDownPos = { x: event.clientX, y: event.clientY };
   });
 
-  // Verifica na subida se foi um clique parado ou um arrasto
   viewer.on("mouseup", (event) => {
-    if (!addingHotspot || !currentScene) return;
+    // 1. Verifica se estamos em algum modo de interação (Adicionar ou Mover)
+    // Se não estivermos em nenhum dos dois, ignora o clique
+    if (!addingHotspot && !movendoHotspot) return;
+    if (!currentScene) return;
 
-    // Calcula a distância do movimento
     const moveX = Math.abs(event.clientX - mouseDownPos.x);
     const moveY = Math.abs(event.clientY - mouseDownPos.y);
-
-    // Se moveu mais de 5 pixels, o usuário estava girando a imagem
     if (moveX > 5 || moveY > 5) return;
 
-    // Se chegou aqui, foi um clique legítimo para adicionar
     const coords = viewer.mouseEventToCoords(event);
-    const pitch = coords[0];
-    const yaw = coords[1];
 
-    const destino = prompt("Digite o ID da cena de destino:");
-    if (!destino || !scenes[destino]) {
-      showAlert("Destino inválido ou cena não encontrada!");
-      addingHotspot = false;
+    // 2. SITUAÇÃO A: Reposicionando um hotspot existente
+    if (movendoHotspot && hotspotEmEdicao) {
+      const h = scenes[currentScene].hotSpots.find(
+        (h) => h.id === hotspotEmEdicao
+      );
+      if (h) {
+        h.pitch = coords[0];
+        h.yaw = coords[1];
+
+        movendoHotspot = false;
+        rebuildViewerFromScenes();
+        abrirModalHotspot(true, h); // Reabre o modal para salvar as mudanças
+      }
       return;
     }
 
-    let targetYaw = prompt(
-      `Hotspot para '${
-        scenes[destino].nome || destino
-      }'.\nDigite o Yaw ao chegar (ex: 0, 90):`,
-      "0"
-    );
-    targetYaw = parseFloat(targetYaw) || 0;
-
-    const hotspotId = "hspot_" + Date.now();
-    const hotspot = {
-      id: hotspotId,
-      pitch: pitch,
-      yaw: yaw,
-      type: "scene",
-      text: encodeURIComponent(`Ir para ${scenes[destino].nome || destino}`),
-      sceneId: destino,
-      targetYaw: targetYaw,
-    };
-
-    scenes[currentScene].hotSpots.push(hotspot);
-
-    try {
-      viewer.addHotSpot(
-        {
-          ...hotspot,
-          text: decodeURIComponent(hotspot.text),
-        },
-        currentScene
-      );
-    } catch (e) {
-      console.error("Erro ao renderizar hotspot:", e);
+    // 3. SITUAÇÃO B: Adicionando um hotspot novo
+    if (addingHotspot) {
+      tempHotspotCoords = { pitch: coords[0], yaw: coords[1] };
+      abrirModalHotspot();
     }
-
-    addingHotspot = false;
-    atualizarListaHotspots();
-    showAlert("Hotspot adicionado com sucesso!");
   });
 
   viewer.on("scenechange", (sceneId) => {
@@ -143,6 +126,83 @@ function setupViewer(initialScenes = {}) {
     atualizarListaCenas();
   });
 }
+
+function abrirModalHotspot(isEdicao = false, hotspotData = null) {
+  const modal = document.getElementById("modalHotspot");
+  const select = document.getElementById("selectDestino");
+  const inputYaw = document.getElementById("inputTargetYaw");
+
+  select.innerHTML = "";
+  Object.keys(scenes).forEach((id) => {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = scenes[id].nome || id;
+    select.appendChild(opt);
+  });
+
+  if (isEdicao && hotspotData) {
+    select.value = hotspotData.sceneId;
+    inputYaw.value = hotspotData.targetYaw || 0;
+    hotspotEmEdicao = hotspotData.id;
+  } else {
+    inputYaw.value = "0";
+    hotspotEmEdicao = null;
+  }
+
+  modal.style.display = "flex";
+}
+
+// Configuração dos cliques dos botões (coloque isso dentro do seu bindUI ou no escopo global)
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("btnCancelarHotspot").onclick = () => {
+    document.getElementById("modalHotspot").style.display = "none";
+    addingHotspot = false;
+  };
+
+  document.getElementById("btnSalvarHotspot").onclick = () => {
+    const destino = document.getElementById("selectDestino").value;
+    const targetYaw =
+      parseFloat(document.getElementById("inputTargetYaw").value) || 0;
+
+    if (!destino) return showAlert("Selecione um destino.");
+
+    if (hotspotEmEdicao) {
+      // Edição
+      const h = scenes[currentScene].hotSpots.find(
+        (h) => h.id === hotspotEmEdicao
+      );
+      if (h) {
+        h.sceneId = destino;
+        h.targetYaw = targetYaw;
+        h.text = encodeURIComponent(
+          `Ir para ${scenes[destino].nome || destino}`
+        );
+      }
+      rebuildViewerFromScenes();
+    } else {
+      // Novo
+      const hotspotId = "hspot_" + Date.now();
+      const hotspot = {
+        id: hotspotId,
+        pitch: tempHotspotCoords.pitch,
+        yaw: tempHotspotCoords.yaw,
+        type: "scene",
+        text: encodeURIComponent(`Ir para ${scenes[destino].nome || destino}`),
+        sceneId: destino,
+        targetYaw: targetYaw,
+      };
+      scenes[currentScene].hotSpots.push(hotspot);
+      viewer.addHotSpot(
+        { ...hotspot, text: decodeURIComponent(hotspot.text) },
+        currentScene
+      );
+    }
+
+    document.getElementById("modalHotspot").style.display = "none";
+    addingHotspot = false;
+    atualizarListaHotspots();
+  };
+});
 
 // ---------- Inicialização ----------
 window.addEventListener("DOMContentLoaded", async () => {
@@ -388,6 +448,12 @@ function onAddScene() {
   const id = document.getElementById("imageId").value.trim();
   if (!fileInput.files[0] || !id) return showAlert("Selecione imagem e ID.");
 
+  if (scenes[id]) {
+    return showAlert(
+      `O ID "${id}" já está em uso. Escolha um nome diferente para esta cena.`
+    );
+  }
+
   const file = fileInput.files[0];
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -445,30 +511,13 @@ window.removerHotspot = function (hotSpotId) {
 };
 
 window.editarHotspot = function (hotSpotId) {
+  // Busca os dados do hotspot atual dentro da cena ativa
   const h = scenes[currentScene].hotSpots.find((h) => h.id === hotSpotId);
   if (!h) return;
 
-  const novoDestino = prompt("Novo ID da cena de destino:", h.sceneId);
-  if (!novoDestino || !scenes[novoDestino]) {
-    showAlert("Cena de destino inválida.");
-    return;
-  }
-
-  let novoYaw = prompt(
-    "Yaw ao chegar na cena (ex: 0, 90, -45):",
-    h.targetYaw ?? 0
-  );
-  novoYaw = parseFloat(novoYaw);
-  if (isNaN(novoYaw)) novoYaw = 0;
-
-  h.sceneId = novoDestino;
-  h.targetYaw = novoYaw;
-  h.text = encodeURIComponent(
-    `Ir para ${scenes[novoDestino].nome || novoDestino}`
-  );
-
-  rebuildViewerFromScenes();
-  atualizarListaHotspots();
+  // Em vez de prompts, chamamos a função que abre o Modal
+  // Passamos 'true' para indicar que é edição e os dados 'h'
+  abrirModalHotspot(true, h);
 };
 
 function atualizarListaHotspots() {
