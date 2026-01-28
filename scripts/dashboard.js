@@ -11,6 +11,8 @@ const userNameDisplay = document.getElementById("user-name");
 const btnLogout = document.getElementById("btn-logout");
 const loadingMessage = document.getElementById("loading-message");
 
+console.log("Verificando!");
+
 // ===============================
 // INIT
 // ===============================
