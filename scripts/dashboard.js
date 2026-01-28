@@ -128,6 +128,11 @@ function renderPanoramas(list) {
         Visualizar
     </button>
 
+    <button class="btn-primary" 
+        onclick="window.location.href='gerador.html?editId=${item.id}'">
+    Editar
+</button>
+
     <button class="btn-secondary"
         style="${!item.pago ? "opacity: 0.5; cursor: not-allowed; filter: grayscale(1);" : ""}"
         onclick="${

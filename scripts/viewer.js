@@ -49,13 +49,24 @@ function renderizarPanorama(estruturaJson) {
     default: {
       firstScene,
       autoLoad: true,
+      loadingNotice: "Carregando...",
     },
     scenes,
   });
 
+  setTimeout(() => {
+    pre_carregarImagens(scenes, firstScene);
+  }, 1000);
+
   // ===== MENU DE CENAS =====
   const menu = document.getElementById("sceneMenu");
   const select = document.getElementById("sceneSelect");
+  const loading = document.getElementById("loading");
+
+  viewer.on("scenechange", (sceneId) => {
+    if (select) select.value = sceneId; // Muda o texto do menu lateral
+    
+  });
 
   if (menu && select) {
     Object.keys(scenes).forEach((id) => {
@@ -69,9 +80,16 @@ function renderizarPanorama(estruturaJson) {
     select.onchange = () => viewer.loadScene(select.value);
     menu.style.display = "block";
   }
+}
 
-  const loading = document.getElementById("loading");
-  if (loading) loading.style.display = "none";
+// =========================
+// Carregar imagens antecipadamente
+// =========================
+function pre_carregarImagens(scenes) {
+  Object.keys(scenes).forEach((id) => {
+    const img = new Image();
+    img.src = scenes[id].panorama; // O navegador baixa e guarda no cache
+  });
 }
 
 // =========================
