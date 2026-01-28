@@ -90,10 +90,21 @@ async function carregarPanorama() {
       .from("panoramas")
       .select("estrutura_json")
       .eq("id", panoramaId)
-      .single();
+      .maybeSingle();
 
-    if (error) throw error;
-    if (!data?.estrutura_json) throw new Error("Estrutura não encontrada.");
+    if (error) {
+      console.error("Erro Supabase:", error);
+      throw new Error("Erro ao conectar com o servidor.");
+    }
+    if (!data) {
+      // Se data for nulo, o ID realmente não existe no banco
+      console.error("ID não encontrado:", panoramaId);
+      alert("Ops! Este panorama não existe ou foi excluído.");
+      return;
+    }
+    if (!data.estrutura_json) {
+      throw new Error("Estrutura do tour está corrompida.");
+    }
 
     renderizarPanorama(data.estrutura_json);
   } catch (err) {

@@ -227,6 +227,7 @@ body {
   animation: modalIn 0.3s ease-out;
 }
 
+
 @keyframes modalIn {
   from {
     transform: translateY(-20px);
