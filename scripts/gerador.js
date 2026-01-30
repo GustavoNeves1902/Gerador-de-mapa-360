@@ -78,6 +78,11 @@ function setupViewer(initialScenes = {}) {
 
   viewer = pannellum.viewer("viewer", {
     default: { firstScene: null, autoLoad: true },
+    strings: {
+      noPanoramaError: "Nenhuma imagem panorâmica foi especificada.",
+      fileAccessError: "O arquivo não pôde ser acessado.",
+      loadingLabel: "Carregando...",
+    },
     scenes: initialScenes,
   });
 
@@ -100,7 +105,7 @@ function setupViewer(initialScenes = {}) {
     // 2. SITUAÇÃO A: Reposicionando um hotspot existente
     if (movendoHotspot && hotspotEmEdicao) {
       const h = scenes[currentScene].hotSpots.find(
-        (h) => h.id === hotspotEmEdicao,
+        (h) => h.id === hotspotEmEdicao
       );
       if (h) {
         h.pitch = coords[0];
@@ -169,7 +174,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (hotspotEmEdicao) {
       // Edição
       const h = scenes[currentScene].hotSpots.find(
-        (h) => h.id === hotspotEmEdicao,
+        (h) => h.id === hotspotEmEdicao
       );
       if (h) {
         h.sceneId = destino;
@@ -192,7 +197,7 @@ document.addEventListener("DOMContentLoaded", () => {
       scenes[currentScene].hotSpots.push(hotspot);
       viewer.addHotSpot(
         { ...hotspot, text: decodeURIComponent(hotspot.text) },
-        currentScene,
+        currentScene
       );
     }
 
@@ -213,119 +218,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
   setupViewer({});
   bindUI();
-
-  const params = new URLSearchParams(window.location.search);
-  const editId = params.get("editId");
-
-  if (editId) {
-    // Se existir um ID na URL, buscamos os dados para preencher a tela
-    carregarDadosParaEdicao(editId);
-  }
 });
-
-async function carregarDadosParaEdicao(id) {
-  showLoading("Carregando dados do tour...");
-  try {
-    const { data, error } = await supabaseClient
-      .from("panoramas")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error) throw error;
-
-    // 1. Preenche o nome do projeto no input
-    document.getElementById("nome").value = data.nome_projeto;
-
-    // 2. Alimenta a variável global 'scenes'
-    const estrutura = data.estrutura_json;
-    for (const cenaId in estrutura) {
-      scenes[cenaId] = {
-        type: "equirectangular",
-        nome: cenaId,
-        dataURL: estrutura[cenaId].panorama, // Aqui é a URL do Storage
-        hotSpots: estrutura[cenaId].hotSpots || [],
-        isOld: true, // Marcador para saber que já está no Storage
-      };
-    }
-
-    // 3. Atualiza a interface
-    currentScene = Object.keys(scenes)[0];
-    rebuildViewerFromScenes();
-    atualizarListaCenas();
-    atualizarListaHotspots();
-
-    // 4. Muda o botão para "Atualizar"
-    const btnSalvar = document.getElementById("salvarPlataforma");
-    btnSalvar.textContent = "Atualizar Tour";
-    // Removemos o listener antigo e colocamos o de atualização
-    btnSalvar.replaceWith(btnSalvar.cloneNode(true));
-    document.getElementById("salvarPlataforma").onclick = () =>
-      atualizarNoSupabase(id, data.pasta_nome);
-
-    hideLoading();
-  } catch (err) {
-    console.error(err);
-    showAlert("Erro ao carregar edição: " + err.message);
-  }
-}
-
-async function atualizarNoSupabase(editId, pastaNome) {
-    showLoading("Atualizando tour...");
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    const estruturaFinal = {};
-
-    try {
-        for (const id in scenes) {
-            const s = scenes[id];
-            
-            // Se a imagem começa com "http", ela já está no Storage
-            if (s.dataURL.startsWith('http')) {
-                estruturaFinal[id] = {
-                    type: s.type,
-                    nome: s.nome,
-                    panorama: s.dataURL,
-                    hotSpots: s.hotSpots
-                };
-            } else {
-                // Se não é URL, é imagem nova (Base64). Fazemos o processo de otimização e upload
-                const blob = await otimizarImagem(s.dataURL, 4096, 0.8);
-                const filePath = `${user.id}/${pastaNome}/scenes/${id}_panorama.jpg`;
-                
-                await supabaseClient.storage.from("panoramas").upload(filePath, blob, { upsert: true });
-                const { data: urlData } = supabaseClient.storage.from("panoramas").getPublicUrl(filePath);
-                
-                estruturaFinal[id] = {
-                    type: s.type,
-                    nome: s.nome,
-                    panorama: urlData.publicUrl,
-                    hotSpots: s.hotSpots
-                };
-            }
-        }
-
-        // Atualiza o Banco de Dados
-        const { error } = await supabaseClient
-            .from("panoramas")
-            .update({
-                nome_projeto: document.getElementById("nome").value,
-                estrutura_json: estruturaFinal,
-                thumb_url: estruturaFinal[Object.keys(estruturaFinal)[0]].panorama
-            })
-            .eq("id", editId);
-
-        if (error) throw error;
-
-        hideLoading();
-        showAlert("✅ Tour atualizado com sucesso!");
-        setTimeout(() => window.location.href = "dashboard.html", 1500);
-
-    } catch (err) {
-        console.error(err);
-        hideLoading();
-        showAlert("Erro ao atualizar: " + err.message);
-    }
-}
 
 function bindUI() {
   document.getElementById("addScene").addEventListener("click", onAddScene);
@@ -376,7 +269,7 @@ async function converterCenasParaDataURL() {
             resolve();
           };
           reader.readAsDataURL(scene.file);
-        }),
+        })
       );
     }
   }
@@ -496,7 +389,7 @@ async function salvarNoSupabase() {
     if (!user) throw new Error("Usuário não autenticado.");
 
     showLoading(
-      "Otimizando e enviando imagens... (Isso pode levar alguns segundos)",
+      "Otimizando e enviando imagens... (Isso pode levar alguns segundos)"
     );
 
     const nomeProjeto = document.getElementById("nome").value || "Tour 360";
@@ -543,7 +436,7 @@ async function salvarNoSupabase() {
     // 2. Criar e subir o arquivo index.html estático para o Storage
     const htmlFinal = gerarHTMLComUrls(
       estruturaParaBanco,
-      Object.keys(estruturaParaBanco)[0],
+      Object.keys(estruturaParaBanco)[0]
     );
     const htmlPath = `${user.id}/${folderName}/index.html`;
     const htmlBlob = new Blob([htmlFinal], { type: "text/html" });
@@ -642,7 +535,7 @@ function onAddScene() {
 
   if (scenes[id]) {
     return showAlert(
-      `O ID "${id}" já está em uso. Escolha um nome diferente para esta cena.`,
+      `O ID "${id}" já está em uso. Escolha um nome diferente para esta cena.`
     );
   }
 
@@ -661,11 +554,14 @@ function onAddScene() {
       panorama: e.target.result,
       hotSpots: [],
     });
+
     if (!currentScene) {
       viewer.loadScene(id);
       currentScene = id;
     }
+
     atualizarListaCenas();
+    showAlert("Cena adicionada!");
   };
   reader.readAsDataURL(file);
 }
@@ -685,6 +581,7 @@ function rebuildViewerFromScenes() {
 
   setupViewer(configScenes);
 
+  // 🔥 ISSO É O QUE ESTAVA FALTANDO
   if (currentScene && scenes[currentScene]) {
     viewer.loadScene(currentScene);
   }
@@ -693,7 +590,7 @@ function rebuildViewerFromScenes() {
 window.removerHotspot = function (hotSpotId) {
   if (!confirm(`Remover hotspot?`)) return;
   scenes[currentScene].hotSpots = scenes[currentScene].hotSpots.filter(
-    (h) => h.id !== hotSpotId,
+    (h) => h.id !== hotSpotId
   );
   try {
     viewer.removeHotSpot(hotSpotId, currentScene);
@@ -769,7 +666,7 @@ async function otimizarImagem(dataURL, larguraAlvo = 4096, qualidade = 0.75) {
           resolve(blob);
         },
         "image/jpeg",
-        qualidade,
+        qualidade
       );
     };
     img.src = dataURL;
@@ -790,7 +687,7 @@ function removerCena(id) {
   // 2. Remove hotspots de outras cenas que apontavam para ela
   for (const sceneId in scenes) {
     scenes[sceneId].hotSpots = scenes[sceneId].hotSpots.filter(
-      (h) => h.sceneId !== id,
+      (h) => h.sceneId !== id
     );
   }
 
