@@ -665,6 +665,7 @@ function onAddScene() {
       viewer.loadScene(id);
       currentScene = id;
     }
+    showAlert(`Cena "${id}" adicionada com sucesso!`);
     atualizarListaCenas();
   };
   reader.readAsDataURL(file);
