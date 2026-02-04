@@ -249,6 +249,13 @@ async function carregarDadosParaEdicao(id) {
       };
     }
 
+    atualizarListaCenas();
+
+    const selectInicial = document.getElementById("idCenaInicial");
+    if (selectInicial && data.id_cena_inicial) {
+      selectInicial.value = data.id_cena_inicial;
+    }
+
     // 3. Atualiza a interface
     currentScene = Object.keys(scenes)[0];
     rebuildViewerFromScenes();
@@ -271,60 +278,70 @@ async function carregarDadosParaEdicao(id) {
 }
 
 async function atualizarNoSupabase(editId, pastaNome) {
-    showLoading("Atualizando tour...");
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    const estruturaFinal = {};
+  showLoading("Atualizando tour...");
+  const {
+    data: { user },
+  } = await supabaseClient.auth.getUser();
+  const estruturaFinal = {};
 
-    try {
-        for (const id in scenes) {
-            const s = scenes[id];
-            
-            // Se a imagem começa com "http", ela já está no Storage
-            if (s.dataURL.startsWith('http')) {
-                estruturaFinal[id] = {
-                    type: s.type,
-                    nome: s.nome,
-                    panorama: s.dataURL,
-                    hotSpots: s.hotSpots
-                };
-            } else {
-                // Se não é URL, é imagem nova (Base64). Fazemos o processo de otimização e upload
-                const blob = await otimizarImagem(s.dataURL, 4096, 0.8);
-                const filePath = `${user.id}/${pastaNome}/scenes/${id}_panorama.jpg`;
-                
-                await supabaseClient.storage.from("panoramas").upload(filePath, blob, { upsert: true });
-                const { data: urlData } = supabaseClient.storage.from("panoramas").getPublicUrl(filePath);
-                
-                estruturaFinal[id] = {
-                    type: s.type,
-                    nome: s.nome,
-                    panorama: urlData.publicUrl,
-                    hotSpots: s.hotSpots
-                };
-            }
-        }
+  const cenaInicialSelecionada = document.getElementById("idCenaInicial").value;
+  const finalFirstSceneId =
+    cenaInicialSelecionada || Object.keys(estruturaFinal)[0];
 
-        // Atualiza o Banco de Dados
-        const { error } = await supabaseClient
-            .from("panoramas")
-            .update({
-                nome_projeto: document.getElementById("nome").value,
-                estrutura_json: estruturaFinal,
-                thumb_url: estruturaFinal[Object.keys(estruturaFinal)[0]].panorama
-            })
-            .eq("id", editId);
+  try {
+    for (const id in scenes) {
+      const s = scenes[id];
 
-        if (error) throw error;
+      // Se a imagem começa com "http", ela já está no Storage
+      if (s.dataURL.startsWith("http")) {
+        estruturaFinal[id] = {
+          type: s.type,
+          nome: s.nome,
+          panorama: s.dataURL,
+          hotSpots: s.hotSpots,
+        };
+      } else {
+        // Se não é URL, é imagem nova (Base64). Fazemos o processo de otimização e upload
+        const blob = await otimizarImagem(s.dataURL, 4096, 0.8);
+        const filePath = `${user.id}/${pastaNome}/scenes/${id}_panorama.jpg`;
 
-        hideLoading();
-        showAlert("✅ Tour atualizado com sucesso!");
-        setTimeout(() => window.location.href = "dashboard.html", 1500);
+        await supabaseClient.storage
+          .from("panoramas")
+          .upload(filePath, blob, { upsert: true });
+        const { data: urlData } = supabaseClient.storage
+          .from("panoramas")
+          .getPublicUrl(filePath);
 
-    } catch (err) {
-        console.error(err);
-        hideLoading();
-        showAlert("Erro ao atualizar: " + err.message);
+        estruturaFinal[id] = {
+          type: s.type,
+          nome: s.nome,
+          panorama: urlData.publicUrl,
+          hotSpots: s.hotSpots,
+        };
+      }
     }
+
+    // Atualiza o Banco de Dados
+    const { error } = await supabaseClient
+      .from("panoramas")
+      .update({
+        nome_projeto: document.getElementById("nome").value,
+        estrutura_json: estruturaFinal,
+        id_cena_inicial: finalFirstSceneId,
+        thumb_url: estruturaFinal[Object.keys(estruturaFinal)[0]].panorama,
+      })
+      .eq("id", editId);
+
+    if (error) throw error;
+
+    hideLoading();
+    showAlert("✅ Tour atualizado com sucesso!");
+    setTimeout(() => (window.location.href = "dashboard.html"), 1500);
+  } catch (err) {
+    console.error(err);
+    hideLoading();
+    showAlert("Erro ao atualizar: " + err.message);
+  }
 }
 
 function bindUI() {
@@ -505,6 +522,11 @@ async function salvarNoSupabase() {
 
     const estruturaParaBanco = {};
 
+    const cenaInicialSelecionada =
+      document.getElementById("idCenaInicial").value;
+    const firstSceneId =
+      cenaInicialSelecionada || Object.keys(estruturaParaBanco)[0];
+
     // 1. Loop para Processar, Comprimir e Subir cada cena
     for (const id in scenes) {
       const s = scenes[id];
@@ -541,10 +563,7 @@ async function salvarNoSupabase() {
     }
 
     // 2. Criar e subir o arquivo index.html estático para o Storage
-    const htmlFinal = gerarHTMLComUrls(
-      estruturaParaBanco,
-      Object.keys(estruturaParaBanco)[0],
-    );
+    const htmlFinal = gerarHTMLComUrls(estruturaParaBanco, firstSceneId);
     const htmlPath = `${user.id}/${folderName}/index.html`;
     const htmlBlob = new Blob([htmlFinal], { type: "text/html" });
 
@@ -568,6 +587,7 @@ async function salvarNoSupabase() {
         // Usamos a URL da primeira cena como thumbnail
         thumb_url:
           estruturaParaBanco[Object.keys(estruturaParaBanco)[0]].panorama,
+        id_cena_inicial: firstSceneId,
         estrutura_json: estruturaParaBanco,
         pago: false, // Começa como não pago por padrão
       },
@@ -747,6 +767,21 @@ function atualizarListaCenas() {
   });
   select.onchange = (e) => viewer.loadScene(e.target.value);
   container.appendChild(select);
+
+  const selectInicial = document.getElementById("idCenaInicial");
+  if (selectInicial) {
+    const valorAtual = selectInicial.value;
+    selectInicial.innerHTML =
+      '<option value="">Selecione a cena de início</option>';
+
+    Object.keys(scenes).forEach((id) => {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = id;
+      if (id === valorAtual) opt.selected = true;
+      selectInicial.appendChild(opt);
+    });
+  }
 }
 
 async function otimizarImagem(dataURL, larguraAlvo = 4096, qualidade = 0.75) {

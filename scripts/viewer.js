@@ -1,4 +1,3 @@
-// viewer.js
 const supabaseClient = window.supabaseClient;
 
 // =========================
@@ -12,14 +11,14 @@ function getPanoramaIdFromUrl() {
 // =========================
 // Renderização
 // =========================
-function renderizarPanorama(estruturaJson) {
+function renderizarPanorama(estruturaJson, idInicial) {
   if (!estruturaJson || Object.keys(estruturaJson).length === 0) {
     alert("Panorama vazio ou inválido.");
     return;
   }
 
   const scenes = {};
-  let firstScene = null;
+  let fallbackFirstScene = null; // 🔥 Definimos um reserva caso o idInicial falhe
 
   Object.keys(estruturaJson).forEach((id) => {
     const cena = estruturaJson[id];
@@ -28,11 +27,12 @@ function renderizarPanorama(estruturaJson) {
       return;
     }
 
-    if (!firstScene) firstScene = id;
+    // A primeira cena que encontrarmos vira nosso fallback
+    if (!fallbackFirstScene) fallbackFirstScene = id;
 
     scenes[id] = {
       type: "equirectangular",
-      panorama: cena.panorama, // 🔥 USANDO A URL DO STORAGE
+      panorama: cena.panorama,
       hotSpots: (cena.hotSpots || []).map((h) => ({
         id: h.id,
         pitch: h.pitch,
@@ -44,6 +44,9 @@ function renderizarPanorama(estruturaJson) {
       })),
     };
   });
+
+  // 🔥 Escolha Inteligente: Usa a definida pelo usuário ou a primeira disponível
+  const firstScene = (idInicial && scenes[idInicial]) ? idInicial : fallbackFirstScene;
 
   const viewer = pannellum.viewer("viewer", {
     default: {
@@ -61,14 +64,13 @@ function renderizarPanorama(estruturaJson) {
   // ===== MENU DE CENAS =====
   const menu = document.getElementById("sceneMenu");
   const select = document.getElementById("sceneSelect");
-  const loading = document.getElementById("loading");
 
   viewer.on("scenechange", (sceneId) => {
-    if (select) select.value = sceneId; // Muda o texto do menu lateral
-    
+    if (select) select.value = sceneId;
   });
 
   if (menu && select) {
+    select.innerHTML = "";
     Object.keys(scenes).forEach((id) => {
       const opt = document.createElement("option");
       opt.value = id;
@@ -85,10 +87,12 @@ function renderizarPanorama(estruturaJson) {
 // =========================
 // Carregar imagens antecipadamente
 // =========================
-function pre_carregarImagens(scenes) {
+function pre_carregarImagens(scenes, idAtual) {
   Object.keys(scenes).forEach((id) => {
-    const img = new Image();
-    img.src = scenes[id].panorama; // O navegador baixa e guarda no cache
+    if (id !== idAtual) { // 🔥 Não recarrega a cena que já está aberta
+        const img = new Image();
+        img.src = scenes[id].panorama;
+    }
   });
 }
 
@@ -106,7 +110,7 @@ async function carregarPanorama() {
   try {
     const { data, error } = await supabaseClient
       .from("panoramas")
-      .select("estrutura_json")
+      .select("estrutura_json, id_cena_inicial")
       .eq("id", panoramaId)
       .maybeSingle();
 
@@ -115,23 +119,15 @@ async function carregarPanorama() {
       throw new Error("Erro ao conectar com o servidor.");
     }
     if (!data) {
-      // Se data for nulo, o ID realmente não existe no banco
-      console.error("ID não encontrado:", panoramaId);
       alert("Ops! Este panorama não existe ou foi excluído.");
       return;
     }
-    if (!data.estrutura_json) {
-      throw new Error("Estrutura do tour está corrompida.");
-    }
 
-    renderizarPanorama(data.estrutura_json);
+    renderizarPanorama(data.estrutura_json, data.id_cena_inicial);
   } catch (err) {
     console.error(err);
     alert("Erro ao carregar panorama.");
   }
 }
 
-// =========================
-// Init
-// =========================
 document.addEventListener("DOMContentLoaded", carregarPanorama);
