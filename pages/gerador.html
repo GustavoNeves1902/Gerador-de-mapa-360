@@ -15,74 +15,7 @@
   <link href="../styles/gerador.css" rel="stylesheet" />
 
   <style>
-    /* --- ESTILOS PARA O MODAL DE QR CODE --- */
-    #modalQR {
-      display: none;
-      /* Escondido por padrão */
-      position: fixed;
-      z-index: 9999;
-      /* Fica acima de tudo */
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.8);
-      /* Fundo escuro */
-      align-items: center;
-      justify-content: center;
-    }
-
-    .qr-content {
-      background-color: #fff;
-      margin: 10% auto;
-      /* Centraliza verticalmente */
-      padding: 20px;
-      border-radius: 10px;
-      width: 300px;
-      text-align: center;
-      position: relative;
-      font-family: sans-serif;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    }
-
-    /* Centraliza a imagem do QR Code */
-    #qrcodeCanvas {
-      display: flex;
-      justify-content: center;
-      margin: 20px 0;
-    }
-
-    .close-qr {
-      position: absolute;
-      top: 10px;
-      right: 15px;
-      font-size: 24px;
-      font-weight: bold;
-      color: #aaa;
-      cursor: pointer;
-    }
-
-    .close-qr:hover {
-      color: #000;
-    }
-
-    /* Botão de download direto dentro do modal */
-    #downloadDirectBtn {
-      background-color: #28a745;
-      color: white;
-      padding: 10px;
-      width: 100%;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      margin-top: 10px;
-      font-size: 14px;
-    }
-
-    #downloadDirectBtn:hover {
-      background-color: #218838;
-    }
-
+    
     /* Loader de carregamento */
     .loader {
       border: 4px solid #f3f3f3;
@@ -165,6 +98,7 @@
       <span class="close">&times;</span>
       <h2>Passo a Passo - Como usar a ferramenta</h2>
       <ol>
+        <li>Insira o nome da sua cena. Esse nome aparecerá no seu Dashboard.</li>
         <li>Selecione uma imagem 360º e insira um ID.</li>
         <li>Clique em "Adicionar Cena" para carregar a imagem.</li>
         <li><strong>Repita os passos anteriores para todas as imagens antes de prosseguir.</strong></li>
@@ -175,10 +109,16 @@
           Escolha a cena que quer editar, clique em "Adicionar Hotspot".
         </li>
         <li>
-          Clique no local exato onde você quer que o hotspot apareça e insira
-          o ID da cena de destino.
+          Clique no local exato onde você quer que o hotspot apareça e selecione
+          a cena de destino.
         </li>
-        <li>Quando terminar, clique em "Publicar na minha conta".</li>
+        <li>
+          Você deve escolher a rotação da imagem da cena de destino.
+        </li>
+        <li>
+          Você pode editar a posição do hotspot posteriormente.
+        </li>
+        <li>Quando terminar de editar todas as cenas, clique em "Publicar na minha conta".</li>
       </ol>
     </div>
   </div>
