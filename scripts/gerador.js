@@ -77,6 +77,15 @@ function setupViewer(initialScenes = {}) {
   } catch (e) {}
 
   viewer = pannellum.viewer("viewer", {
+
+    "autoLoad": true,
+    "notSupportedMessage": "Seu navegador não tem suporte para WebGL.",
+
+    "strings": {
+      "noPanoramaError": "Nenhuma imagem panorâmica foi especificada",
+      "fileAcessError": "O arquivo não pôde ser acessado",
+      "loadingLabel": "Carregando..."
+    },
     default: { firstScene: null, autoLoad: true },
     scenes: initialScenes,
   });
